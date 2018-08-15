@@ -28,7 +28,7 @@ public:
 	void handle_speech_prepare_options(uint32_t msgtype, std::shared_ptr<Caps>& msg);
 	void handle_speech_options(uint32_t msgtype, std::shared_ptr<Caps>& msg);
 	void handle_speech_stack(uint32_t msgtype, std::shared_ptr<Caps>& msg);
-	void handle_turen_awake(uint32_t msgtype, std::shared_ptr<Caps>& msg);
+	void handle_turen_start_voice(uint32_t msgtype, std::shared_ptr<Caps>& msg);
 	void handle_turen_voice(uint32_t msgtype, std::shared_ptr<Caps>& msg);
 	void handle_turen_sleep(uint32_t msgtype, std::shared_ptr<Caps>& msg);
 

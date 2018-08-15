@@ -20,7 +20,7 @@ static NamedEventHandler named_handler[] = {
 	{ "rokid.speech.prepare_options", &EventHandler::handle_speech_prepare_options },
 	{ "rokid.speech.options", &EventHandler::handle_speech_options },
 	{ "rokid.speech.stack", &EventHandler::handle_speech_stack },
-	{ "rokid.turen.awake", &EventHandler::handle_turen_awake },
+	{ "rokid.turen.start_voice", &EventHandler::handle_turen_start_voice },
 	{ "rokid.turen.voice", &EventHandler::handle_turen_voice },
 	{ "rokid.turen.sleep", &EventHandler::handle_turen_sleep },
 };
@@ -185,7 +185,7 @@ void EventHandler::handle_speech_stack(uint32_t msgtype, shared_ptr<Caps>& msg) 
 	KLOGI(TAG, "recv speech stack %s", speech_stack.c_str());
 }
 
-void EventHandler::handle_turen_awake(uint32_t msgtype, shared_ptr<Caps>& msg) {
+void EventHandler::handle_turen_start_voice(uint32_t msgtype, shared_ptr<Caps>& msg) {
 	VoiceOptions vopts;
 	int32_t v;
 
@@ -193,30 +193,30 @@ void EventHandler::handle_turen_awake(uint32_t msgtype, shared_ptr<Caps>& msg) {
 	if (msg->read_string(vopts.voice_trigger) != CAPS_SUCCESS) {
 		goto msg_invalid;
 	}
-	KLOGI(TAG, "recv turen awake: voice trigger = %s", vopts.voice_trigger.c_str());
+	KLOGI(TAG, "recv turen start_voice: voice trigger = %s", vopts.voice_trigger.c_str());
 	if (msg->read(v) != CAPS_SUCCESS) {
 		goto msg_invalid;
 	}
 	vopts.trigger_start = v;
-	KLOGI(TAG, "recv turen awake: trigger start = %d", v);
+	KLOGI(TAG, "recv turen start_voice: trigger start = %d", v);
 	if (msg->read(v) != CAPS_SUCCESS) {
 		goto msg_invalid;
 	}
 	vopts.trigger_length = v;
-	KLOGI(TAG, "recv turen awake: trigger length = %d", v);
+	KLOGI(TAG, "recv turen start_voice: trigger length = %d", v);
 	if (msg->read(vopts.voice_power) != CAPS_SUCCESS) {
 		goto msg_invalid;
 	}
-	KLOGI(TAG, "recv turen awake: voice power = %f", vopts.voice_power);
+	KLOGI(TAG, "recv turen start_voice: voice power = %f", vopts.voice_power);
 	if (msg->read(v) != CAPS_SUCCESS) {
 		goto msg_invalid;
 	}
 	vopts.trigger_confirm_by_cloud = v;
-	KLOGI(TAG, "recv turen awake: trigger confirm by cloud = %d", v);
+	KLOGI(TAG, "recv turen start_voice: trigger confirm by cloud = %d", v);
 	if (msg->read(turen_id) != CAPS_SUCCESS) {
 		goto msg_invalid;
 	}
-	KLOGI(TAG, "recv turen awake: turen id = %d", turen_id);
+	KLOGI(TAG, "recv turen start_voice: turen id = %d", turen_id);
 	// TODO: get skill options
 
 	if (speech_id > 0) {
