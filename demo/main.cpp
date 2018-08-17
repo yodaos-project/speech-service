@@ -54,7 +54,7 @@ int main(int argc, char** argv) {
 	msg->write((int32_t)1);
 	// vad begin
 	msg->write((int32_t)0);
-	cli->post("rokid.speech.options", msg, FLORA_MSGTYPE_PERSIST);
+	cli->post("rokid.speech.speech_options", msg, FLORA_MSGTYPE_PERSIST);
 
 	iv.run(cli);
 	return 0;

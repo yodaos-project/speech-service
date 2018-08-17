@@ -18,7 +18,7 @@ typedef struct {
 
 static NamedEventHandler named_handler[] = {
 	{ "rokid.speech.prepare_options", &EventHandler::handle_speech_prepare_options },
-	{ "rokid.speech.options", &EventHandler::handle_speech_options },
+	{ "rokid.speech.speech_options", &EventHandler::handle_speech_options },
 	{ "rokid.speech.stack", &EventHandler::handle_speech_stack },
 	{ "rokid.turen.start_voice", &EventHandler::handle_turen_start_voice },
 	{ "rokid.turen.voice", &EventHandler::handle_turen_voice },
