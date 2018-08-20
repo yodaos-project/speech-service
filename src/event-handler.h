@@ -45,6 +45,7 @@ public:
 	std::string speech_stack;
 	int32_t turen_id = 0;
 	int32_t speech_id = 0;
+	int32_t cancelled_turen_id = 0;
 	std::mutex speech_mutex;
 	std::condition_variable speech_cond;
 	bool speech_prepared = false;

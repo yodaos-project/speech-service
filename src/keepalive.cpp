@@ -12,7 +12,7 @@ typedef struct {
 
 static FloraEventInfo flora_events[] = {
 	{ FLORA_MSGTYPE_PERSIST, "rokid.speech.prepare_options" },
-	{ FLORA_MSGTYPE_PERSIST, "rokid.speech.speech_options" },
+	{ FLORA_MSGTYPE_PERSIST, "rokid.speech.options" },
 	{ FLORA_MSGTYPE_PERSIST, "rokid.speech.stack" },
 	{ FLORA_MSGTYPE_INSTANT, "rokid.turen.start_voice" },
 	{ FLORA_MSGTYPE_INSTANT, "rokid.turen.voice" },

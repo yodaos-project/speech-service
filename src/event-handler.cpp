@@ -18,7 +18,7 @@ typedef struct {
 
 static NamedEventHandler named_handler[] = {
 	{ "rokid.speech.prepare_options", &EventHandler::handle_speech_prepare_options },
-	{ "rokid.speech.speech_options", &EventHandler::handle_speech_options },
+	{ "rokid.speech.options", &EventHandler::handle_speech_options },
 	{ "rokid.speech.stack", &EventHandler::handle_speech_stack },
 	{ "rokid.turen.start_voice", &EventHandler::handle_turen_start_voice },
 	{ "rokid.turen.voice", &EventHandler::handle_turen_voice },
@@ -213,6 +213,7 @@ void EventHandler::handle_turen_start_voice(uint32_t msgtype, shared_ptr<Caps>& 
 	}
 	vopts.trigger_confirm_by_cloud = v;
 	KLOGI(TAG, "recv turen start_voice: trigger confirm by cloud = %d", v);
+	cancelled_turen_id = turen_id;
 	if (msg->read(turen_id) != CAPS_SUCCESS) {
 		goto msg_invalid;
 	}
@@ -266,6 +267,36 @@ void EventHandler::do_speech_poll() {
 	while (true) {
 		speech->poll(result);
 		switch (result.type) {
+			case SPEECH_RES_INTER:
+				KLOGI(TAG, "speech poll INTER");
+				cli = flora_cli;
+				if (cli.get()) {
+					if (result.asr.length() > 0) {
+						msg = Caps::new_instance();
+						msg->write(result.asr.c_str());
+						msg->write(turen_id);
+						KLOGI(TAG, "speech post rokid.speech.inter_asr [%d]%s",
+								turen_id, result.asr.c_str());
+						if (cli->post("rokid.speech.inter_asr", msg, FLORA_MSGTYPE_INSTANT)
+								== FLORA_CLI_ECONN) {
+							KLOGI(TAG, "notify keepalive thread: reconnect flora client");
+							flora_disconnected();
+						}
+					}
+					if (result.extra.length() > 0) {
+						msg = Caps::new_instance();
+						msg->write(result.extra.c_str());
+						msg->write(turen_id);
+						KLOGI(TAG, "speech post rokid.speech.extra [%d]%s",
+								turen_id, result.extra.c_str());
+						if (cli->post("rokid.speech.extra", msg, FLORA_MSGTYPE_INSTANT)
+								== FLORA_CLI_ECONN) {
+							KLOGI(TAG, "notify keepalive thread: reconnect flora client");
+							flora_disconnected();
+						}
+					}
+				}
+				break;
 			case SPEECH_RES_ASR_FINISH:
 				KLOGI(TAG, "speech poll ASR_FINISH");
 				cli = flora_cli;
@@ -273,6 +304,8 @@ void EventHandler::do_speech_poll() {
 					msg = Caps::new_instance();
 					msg->write(result.asr.c_str());
 					msg->write(turen_id);
+					KLOGI(TAG, "speech post rokid.speech.final_asr [%d]%s",
+							turen_id, result.asr.c_str());
 					if (cli->post("rokid.speech.final_asr", msg, FLORA_MSGTYPE_INSTANT)
 							== FLORA_CLI_ECONN) {
 						KLOGI(TAG, "notify keepalive thread: reconnect flora client");
@@ -301,7 +334,24 @@ void EventHandler::do_speech_poll() {
 					msg = Caps::new_instance();
 					msg->write((int32_t)result.err);
 					msg->write(turen_id);
+					KLOGI(TAG, "speech post rokid.speech.error [%d]%d",
+							turen_id, (int32_t)result.err);
 					if (cli->post("rokid.speech.error", msg, FLORA_MSGTYPE_INSTANT)
+							== FLORA_CLI_ECONN) {
+						KLOGI(TAG, "notify keepalive thread: reconnect flora client");
+						flora_disconnected();
+					}
+				}
+				break;
+			case SPEECH_RES_CANCELLED:
+				KLOGI(TAG, "speech poll CANCELLED");
+				cli = flora_cli;
+				if (cli.get()) {
+					msg = Caps::new_instance();
+					msg->write(cancelled_turen_id);
+					KLOGI(TAG, "speech post rokid.speech.cancel %d",
+							cancelled_turen_id);
+					if (cli->post("rokid.speech.cancel", msg, FLORA_MSGTYPE_INSTANT)
 							== FLORA_CLI_ECONN) {
 						KLOGI(TAG, "notify keepalive thread: reconnect flora client");
 						flora_disconnected();
