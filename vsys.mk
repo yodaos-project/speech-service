@@ -8,5 +8,5 @@ include $(build-executable)
 include $(clear-vars)
 local.module := speech-service.ndk
 local.ndk-script := $(local-path)/ndk.mk
-local.ndk-modules := flora speech
+local.ndk-modules := flora-cli speech
 include $(build-ndk-module)
