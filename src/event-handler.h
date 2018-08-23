@@ -35,6 +35,7 @@ public:
 private:
 	void do_speech_poll();
 	void flora_disconnected();
+	void post_error(int32_t err);
 
 public:
 	std::mutex reconn_mutex;

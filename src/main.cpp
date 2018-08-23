@@ -48,6 +48,8 @@ static bool parse_cmdline(clargs_h h, CmdlineArgs& res) {
 			if (val[0] == '\0')
 				goto invalid_option;
 			res.flora_uri = val;
+			res.flora_uri.append("#");
+			res.flora_uri.append(TAG);
 		} else if (strcmp(key, "flora-reconn-interval") == 0) {
 			if (val[0] == '\0')
 				goto invalid_option;

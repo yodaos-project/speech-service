@@ -12,6 +12,6 @@ public:
 	}
 
 	uint32_t flora_bufsize = 0;
-	std::string flora_uri = "tcp://0.0.0.0:2517/";
+	std::string flora_uri = "unix:flora-dispatcher-socket#" TAG;
 	std::chrono::milliseconds flora_reconn_interval;
 };
