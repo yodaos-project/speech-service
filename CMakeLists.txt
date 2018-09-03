@@ -68,6 +68,10 @@ target_link_libraries(speech-service
 	${speech_LIBRARIES}
 )
 
+install(TARGETS speech-service
+	RUNTIME DESTINATION bin
+)
+
 if(BUILD_DEMO)
 file(GLOB demo_src_files
 	demo/*.cpp
