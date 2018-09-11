@@ -17,6 +17,7 @@ static FloraEventInfo flora_events[] = {
 	{ FLORA_MSGTYPE_INSTANT, "rokid.turen.start_voice" },
 	{ FLORA_MSGTYPE_INSTANT, "rokid.turen.voice" },
 	{ FLORA_MSGTYPE_INSTANT, "rokid.turen.sleep" },
+	{ FLORA_MSGTYPE_INSTANT, "rokid.speech.put_text" },
 };
 
 void Keepalive::run(CmdlineArgs& args, EventHandler& event_handler) {
