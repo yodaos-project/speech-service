@@ -479,5 +479,6 @@ void EventHandler::flora_disconnected() {
 }
 
 void EventHandler::disconnected() {
-  flora_disconnected();
+  thread tmp([this]() { this->flora_disconnected(); });
+  tmp.detach();
 }
