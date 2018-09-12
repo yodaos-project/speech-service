@@ -4,7 +4,6 @@
 #include <condition_variable>
 #include <map>
 #include <list>
-#include <utility>
 #include "defs.h"
 #include "speech.h"
 #include "flora-cli.h"
@@ -12,6 +11,11 @@
 class EventHandler;
 typedef void (EventHandler::*EventHandleFunc)(uint32_t msgtype, std::shared_ptr<Caps>& msg);
 typedef std::map<std::string, EventHandleFunc> EventHandlerMap;
+typedef struct {
+  std::string msgid;
+  int32_t speechid;
+  int32_t custom;
+} TextReqInfo;
 
 class EventHandler : public flora::ClientCallback {
 public:
@@ -39,7 +43,7 @@ private:
   void do_speech_poll();
   void flora_disconnected();
   void post_error(int32_t err, int32_t id);
-  bool check_pending_texts(int32_t id, std::string& extid);
+  bool check_pending_texts(int32_t id, std::string& extid, int32_t& custom);
 
 public:
   std::mutex reconn_mutex;
@@ -55,6 +59,6 @@ public:
   std::condition_variable speech_cond;
   // mutex for speech put_text and poll
   std::mutex text_mutex;
-  std::list<std::pair<std::string, int32_t> > pending_texts;
+  std::list<TextReqInfo> pending_texts;
   bool speech_prepared = false;
 };

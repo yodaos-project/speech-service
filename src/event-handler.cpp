@@ -289,6 +289,8 @@ void EventHandler::handle_speech_put_text(uint32_t msgtype, shared_ptr<Caps>& ms
   string id;
   VoiceOptions vopts;
   int32_t sid;
+  int32_t custom;
+  list<TextReqInfo>::iterator it;
 
   if (msg->read_string(asr) != CAPS_SUCCESS) {
     goto msg_invalid;
@@ -296,11 +298,17 @@ void EventHandler::handle_speech_put_text(uint32_t msgtype, shared_ptr<Caps>& ms
   if (msg->read_string(id) != CAPS_SUCCESS) {
     goto msg_invalid;
   }
+  if (msg->read(custom) != CAPS_SUCCESS) {
+    goto msg_invalid;
+  }
   vopts.stack = speech_stack;
   // TODO: set skill options
   text_mutex.lock();
   sid = speech->put_text(asr.c_str(), &vopts);
-  pending_texts.push_back(pair<string, int32_t>(id, sid));
+  it = pending_texts.emplace(pending_texts.end());
+  (*it).msgid = id;
+  (*it).speechid = sid;
+  (*it).custom = custom;
   text_mutex.unlock();
 
 msg_invalid:
@@ -312,6 +320,7 @@ void EventHandler::do_speech_poll() {
   shared_ptr<flora::Client> cli;
   shared_ptr<Caps> msg;
   string extid;
+  int32_t custom;
 
   unique_lock<mutex> locker(speech_mutex);
   if (speech_prepared == false)
@@ -372,13 +381,14 @@ void EventHandler::do_speech_poll() {
         cli = flora_cli;
         if (cli.get()) {
           string msgname = "rokid.speech.nlp";
-          if (check_pending_texts(result.id, extid)) {
+          if (check_pending_texts(result.id, extid, custom)) {
             msgname.append(".");
             msgname.append(extid);
           }
           msg = Caps::new_instance();
           msg->write(result.nlp.c_str());
           msg->write(result.action.c_str());
+          msg->write(custom);
           if (cli->post(msgname.c_str(), msg, FLORA_MSGTYPE_INSTANT)
               == FLORA_CLI_ECONN) {
             KLOGI(TAG, "notify keepalive thread: reconnect flora client");
@@ -395,12 +405,13 @@ void EventHandler::do_speech_poll() {
         cli = flora_cli;
         if (cli.get()) {
           string msgname = "rokid.speech.cancel";
-          if (check_pending_texts(result.id, extid)) {
+          if (check_pending_texts(result.id, extid, custom)) {
             msgname.append(".");
             msgname.append(extid);
           }
           msg = Caps::new_instance();
           msg->write(cancelled_turen_id);
+          msg->write(custom);
           KLOGI(TAG, "speech post rokid.speech.cancel %d",
               cancelled_turen_id);
           if (cli->post(msgname.c_str(), msg, FLORA_MSGTYPE_INSTANT)
@@ -418,17 +429,19 @@ void EventHandler::post_error(int32_t err, int32_t id) {
   shared_ptr<flora::Client> cli;
   shared_ptr<Caps> msg;
   string extid;
+  int32_t custom;
 
   cli = flora_cli;
   if (cli.get()) {
     string msgname = "rokid.speech.error";
-    if (check_pending_texts(id, extid)) {
+    if (check_pending_texts(id, extid, custom)) {
       msgname.append(".");
       msgname.append(extid);
     }
     msg = Caps::new_instance();
     msg->write(err);
     msg->write(turen_id);
+    msg->write(custom);
     KLOGI(TAG, "speech post rokid.speech.error [%d]%d",
         turen_id, err);
     if (cli->post(msgname.c_str(), msg, FLORA_MSGTYPE_INSTANT)
@@ -439,16 +452,17 @@ void EventHandler::post_error(int32_t err, int32_t id) {
   }
 }
 
-bool EventHandler::check_pending_texts(int32_t id, string& extid) {
+bool EventHandler::check_pending_texts(int32_t id, string& extid, int32_t& custom) {
   lock_guard<mutex> locker(text_mutex);
   bool ret = false;
 
   if (pending_texts.empty())
     return false;
-  list<pair<string, int32_t> >::iterator it;
+  list<TextReqInfo>::iterator it;
   for (it = pending_texts.begin(); it != pending_texts.end(); ++it) {
-    if ((*it).second = id) {
-      extid = (*it).first;
+    if ((*it).speechid == id) {
+      extid = (*it).msgid;
+      custom = (*it).custom;
       pending_texts.erase(it);
       ret = true;
       break;
