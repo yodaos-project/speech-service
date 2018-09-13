@@ -43,6 +43,8 @@ private:
   void do_speech_poll();
   void flora_disconnected();
   void post_error(int32_t err, int32_t id);
+  void post_error(int32_t err, const std::string& extid,
+      int32_t custom, std::shared_ptr<flora::Client>& cli);
   bool check_pending_texts(int32_t id, std::string& extid, int32_t& custom);
 
 public:

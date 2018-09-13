@@ -24,6 +24,7 @@ static void print_prompt(const char* progname) {
 		"\t--flora-uri=*    flora服务uri\n"
 		"\t--flora-bufsize=*    flora消息缓冲区大小\n"
 		"\t--flora-reconn-interval=*    flora服务重连时间间隔(ms)\n"
+		"\t--log-service-port=*    log服务端口\n"
 		;
 	KLOGI(TAG, prompt, progname);
 }
@@ -57,6 +58,13 @@ static bool parse_cmdline(clargs_h h, CmdlineArgs& res) {
 			if (ep[0] != '\0')
 				goto invalid_option;
 			res.flora_reconn_interval = milliseconds(iv);
+		} else if (strcmp(key, "log-service-port") == 0) {
+			if (val[0] == '\0')
+				goto invalid_option;
+			iv = strtol(val, &ep, 10);
+			if (ep[0] != '\0')
+				goto invalid_option;
+			res.log_service_port = iv;
 		} else
 			goto invalid_option;
 	}
@@ -94,6 +102,13 @@ int main(int argc, char** argv) {
 }
 
 void run(CmdlineArgs& args) {
+  if (args.log_service_port > 0) {
+    TCPSocketArg rlogarg;
+    rlogarg.host = "0.0.0.0";
+    rlogarg.port = args.log_service_port;
+    rokid_log_ctl(ROKID_LOG_CTL_DEFAULT_ENDPOINT, "tcp-socket", &rlogarg);
+  }
+
 	Keepalive keepalive;
 	EventHandler event_handler;
 

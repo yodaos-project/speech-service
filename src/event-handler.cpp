@@ -305,11 +305,19 @@ void EventHandler::handle_speech_put_text(uint32_t msgtype, shared_ptr<Caps>& ms
   // TODO: set skill options
   text_mutex.lock();
   sid = speech->put_text(asr.c_str(), &vopts);
-  it = pending_texts.emplace(pending_texts.end());
-  (*it).msgid = id;
-  (*it).speechid = sid;
-  (*it).custom = custom;
-  text_mutex.unlock();
+  if (sid > 0) {
+    it = pending_texts.emplace(pending_texts.end());
+    (*it).msgid = id;
+    (*it).speechid = sid;
+    (*it).custom = custom;
+    text_mutex.unlock();
+  } else {
+    text_mutex.unlock();
+    shared_ptr<flora::Client> cli = flora_cli;
+    if (cli.get())
+      post_error(200, id, custom, flora_cli);
+  }
+  return;
 
 msg_invalid:
   KLOGW(TAG, "invalid %s msg received", named_handler[6].event);
@@ -427,28 +435,35 @@ void EventHandler::do_speech_poll() {
 
 void EventHandler::post_error(int32_t err, int32_t id) {
   shared_ptr<flora::Client> cli;
-  shared_ptr<Caps> msg;
   string extid;
-  int32_t custom;
+  int32_t custom = 0;
 
   cli = flora_cli;
   if (cli.get()) {
-    string msgname = "rokid.speech.error";
-    if (check_pending_texts(id, extid, custom)) {
-      msgname.append(".");
-      msgname.append(extid);
-    }
-    msg = Caps::new_instance();
-    msg->write(err);
-    msg->write(turen_id);
-    msg->write(custom);
-    KLOGI(TAG, "speech post rokid.speech.error [%d]%d",
-        turen_id, err);
-    if (cli->post(msgname.c_str(), msg, FLORA_MSGTYPE_INSTANT)
-        == FLORA_CLI_ECONN) {
-      KLOGI(TAG, "notify keepalive thread: reconnect flora client");
-      flora_disconnected();
-    }
+    check_pending_texts(id, extid, custom);
+    post_error(err, extid, custom, cli);
+  }
+}
+
+void EventHandler::post_error(int32_t err, const string& extid,
+    int32_t custom, shared_ptr<flora::Client>& cli) {
+  shared_ptr<Caps> msg;
+  string msgname = "rokid.speech.error";
+
+  if (extid.length() > 0) {
+    msgname.append(".");
+    msgname.append(extid);
+  }
+  msg = Caps::new_instance();
+  msg->write(err);
+  msg->write(turen_id);
+  msg->write(custom);
+  KLOGI(TAG, "speech post %s [%d]%d, custom %d", msgname.c_str(),
+      turen_id, err, custom);
+  if (cli->post(msgname.c_str(), msg, FLORA_MSGTYPE_INSTANT)
+      == FLORA_CLI_ECONN) {
+    KLOGI(TAG, "notify keepalive thread: reconnect flora client");
+    flora_disconnected();
   }
 }
 
