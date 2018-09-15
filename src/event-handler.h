@@ -4,6 +4,7 @@
 #include <condition_variable>
 #include <map>
 #include <list>
+#include <utility>
 #include "defs.h"
 #include "speech.h"
 #include "flora-cli.h"
@@ -42,10 +43,11 @@ public:
 private:
   void do_speech_poll();
   void flora_disconnected();
-  void post_error(int32_t err, int32_t id);
+  void post_error(int32_t err, int32_t id, int32_t turen_id);
   void post_error(int32_t err, const std::string& extid,
-      int32_t custom, std::shared_ptr<flora::Client>& cli);
+      int32_t custom, int32_t turen_id, std::shared_ptr<flora::Client>& cli);
   bool check_pending_texts(int32_t id, std::string& extid, int32_t& custom);
+  void finish_voice_req(int32_t speech_id);
 
 public:
   std::mutex reconn_mutex;
@@ -54,11 +56,13 @@ public:
   std::shared_ptr<flora::Client> flora_cli;
   EventHandlerMap handlers;
   std::string speech_stack;
-  int32_t turen_id = 0;
-  int32_t speech_id = 0;
-  int32_t cancelled_turen_id = 0;
   std::mutex speech_mutex;
   std::condition_variable speech_cond;
+  // mutex for speech voice request
+  std::mutex voice_mutex;
+  // not finish voice request
+  // turen id --- speech id
+  std::list<std::pair<int32_t, int32_t> > pending_voices;
   // mutex for speech put_text and poll
   std::mutex text_mutex;
   std::list<TextReqInfo> pending_texts;
