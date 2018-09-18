@@ -36,7 +36,7 @@ static NamedEventHandler named_handler[] = {
 /**
 static int pcm_file = -1;
 void open_pcm_file() {
-  pcm_file = open("/data/speech-service.pcm", O_CREAT | O_WRONLY);
+  pcm_file = open("/data/speech-service.pcm", O_CREAT | O_WRONLY | O_TRUNC);
 }
 
 void write_pcm_file(string& data) {
@@ -219,7 +219,11 @@ void EventHandler::handle_turen_start_voice(uint32_t msgtype, shared_ptr<Caps>& 
   int32_t turen_id;
   int32_t speech_id;
 
+  // debug
+  // open_pcm_file();
+
   vopts.stack = speech_stack;
+  KLOGI(TAG, "stack %s", speech_stack.c_str());
   if (msg->read_string(vopts.voice_trigger) != CAPS_SUCCESS) {
     goto msg_invalid;
   }
@@ -243,6 +247,10 @@ void EventHandler::handle_turen_start_voice(uint32_t msgtype, shared_ptr<Caps>& 
   }
   vopts.trigger_confirm_by_cloud = v;
   KLOGI(TAG, "recv turen start_voice: trigger confirm by cloud = %d", v);
+  if (msg->read_string(vopts.voice_extra) != CAPS_SUCCESS) {
+    goto msg_invalid;
+  }
+  KLOGI(TAG, "recv turen start_voice: voice extra = %s", vopts.voice_extra.c_str());
   if (msg->read(turen_id) != CAPS_SUCCESS) {
     goto msg_invalid;
   }
@@ -275,6 +283,8 @@ void EventHandler::handle_turen_voice(uint32_t msgtype, shared_ptr<Caps>& msg) {
   }
   voice_mutex.lock();
   if (!pending_voices.empty()) {
+    // debug
+    // write_pcm_file(data);
     speech->put_voice(pending_voices.back().second,
         (const uint8_t*)data.data(), data.length());
   } else
@@ -402,6 +412,8 @@ void EventHandler::do_speech_poll() {
         break;
       case SPEECH_RES_END:
         KLOGI(TAG, "speech poll END");
+        // debug
+        // close_pcm_file();
         cli = flora_cli;
         if (cli.get()) {
           string msgname = "rokid.speech.nlp";
@@ -425,10 +437,14 @@ void EventHandler::do_speech_poll() {
         break;
       case SPEECH_RES_ERROR:
         KLOGI(TAG, "speech poll ERROR");
+        // debug
+        // close_pcm_file();
         post_error((int32_t)result.err, result.id, front_req.first);
         break;
       case SPEECH_RES_CANCELLED:
         KLOGI(TAG, "speech poll CANCELLED");
+        // debug
+        // close_pcm_file();
         cli = flora_cli;
         if (cli.get()) {
           string msgname = "rokid.speech.cancel";
