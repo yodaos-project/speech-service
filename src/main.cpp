@@ -5,7 +5,6 @@
 #include "clargs.h"
 #include "rlog.h"
 #include "defs.h"
-#include "keepalive.h"
 #include "event-handler.h"
 
 #define MACRO_TO_STRING(x) MACRO_TO_STRING1(x)
@@ -109,9 +108,6 @@ void run(CmdlineArgs& args) {
     rokid_log_ctl(ROKID_LOG_CTL_DEFAULT_ENDPOINT, "tcp-socket", &rlogarg);
   }
 
-	Keepalive keepalive;
 	EventHandler event_handler;
-
 	event_handler.init(args);
-	keepalive.run(args, event_handler);
 }

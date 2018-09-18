@@ -17,21 +17,6 @@ using namespace std;
 using namespace rokid;
 using namespace rokid::speech;
 
-typedef struct {
-  const char* event;
-  EventHandleFunc handler;
-} NamedEventHandler;
-
-static NamedEventHandler named_handler[] = {
-  { "rokid.speech.prepare_options", &EventHandler::handle_speech_prepare_options },
-  { "rokid.speech.options", &EventHandler::handle_speech_options },
-  { "rokid.speech.stack", &EventHandler::handle_speech_stack },
-  { "rokid.turen.start_voice", &EventHandler::handle_turen_start_voice },
-  { "rokid.turen.voice", &EventHandler::handle_turen_voice },
-  { "rokid.turen.sleep", &EventHandler::handle_turen_sleep },
-  { "rokid.speech.put_text", &EventHandler::handle_speech_put_text},
-};
-
 // debug
 /**
 static int pcm_file = -1;
@@ -54,34 +39,50 @@ void close_pcm_file() {
 */
 
 void EventHandler::init(CmdlineArgs& args) {
-  int32_t count = sizeof(named_handler) / sizeof(NamedEventHandler);
-  int32_t i;
+  FloraMsgInfo key;
 
-  for (i = 0; i < count; ++i) {
-    handlers[named_handler[i].event] = named_handler[i].handler;
-  }
+  key.name = "rokid.speech.prepare_options";
+  key.type = FLORA_MSGTYPE_PERSIST;
+  handlers.insert(make_pair(key, [this](shared_ptr<Caps>& msg) { this->handle_speech_prepare_options(msg); }));
+  key.name = "rokid.speech.options";
+  key.type = FLORA_MSGTYPE_PERSIST;
+  handlers.insert(make_pair(key, [this](shared_ptr<Caps>& msg) { this->handle_speech_options(msg); }));
+  key.name = "rokid.speech.stack";
+  key.type = FLORA_MSGTYPE_PERSIST;
+  handlers.insert(make_pair(key, [this](shared_ptr<Caps>& msg) { this->handle_speech_stack(msg); }));
+  key.name = "rokid.turen.start_voice";
+  key.type = FLORA_MSGTYPE_INSTANT;
+  handlers.insert(make_pair(key, [this](shared_ptr<Caps>& msg) { this->handle_turen_start_voice(msg); }));
+  key.name = "rokid.turen.voice";
+  key.type = FLORA_MSGTYPE_INSTANT;
+  handlers.insert(make_pair(key, [this](shared_ptr<Caps>& msg) { this->handle_turen_voice(msg); }));
+  key.name = "rokid.turen.end_voice";
+  key.type = FLORA_MSGTYPE_INSTANT;
+  handlers.insert(make_pair(key, [this](shared_ptr<Caps>& msg) { this->handle_turen_end_voice(msg); }));
+  key.name = "rokid.turen.sleep";
+  key.type = FLORA_MSGTYPE_INSTANT;
+  handlers.insert(make_pair(key, [this](shared_ptr<Caps>& msg) { this->handle_turen_sleep(msg); }));
+  key.name = "rokid.speech.put_text";
+  key.type = FLORA_MSGTYPE_INSTANT;
+  handlers.insert(make_pair(key, [this](shared_ptr<Caps>& msg) { this->handle_speech_put_text(msg); }));
 
   speech = Speech::new_instance();
   std::thread speech_poll_thread([this]() { this->do_speech_poll(); });
   speech_poll_thread.detach();
-}
 
-void EventHandler::set_flora_client(shared_ptr<flora::Client>& cli) {
-  flora_cli = std::move(cli);
+  flora_keepalive(args);
 }
 
 void EventHandler::recv_post(const char* name, uint32_t msgtype,
     shared_ptr<Caps>& msg) {
-  EventHandlerMap::iterator it = handlers.find(name);
-  if (it == handlers.end()) {
-    KLOGW(TAG, "event handler for %s not found", name);
-    return;
-  }
-  EventHandleFunc handler = it->second;
-  (this->*handler)(msgtype, msg);
+  FloraMsgInfo key;
+  key.name = name;
+  key.type = msgtype;
+  EventHandlerMap::iterator it = handlers.find(key);
+  it->second(msg);
 }
 
-void EventHandler::handle_speech_prepare_options(uint32_t msgtype, shared_ptr<Caps>& msg) {
+void EventHandler::handle_speech_prepare_options(shared_ptr<Caps>& msg) {
   string uri;
   PrepareOptions popts;
   int32_t v;
@@ -144,10 +145,10 @@ void EventHandler::handle_speech_prepare_options(uint32_t msgtype, shared_ptr<Ca
   return;
 
 msg_invalid:
-  KLOGW(TAG, "invalid %s msg received", named_handler[0].event);
+  KLOGW(TAG, "invalid rokid.speech.prepare_options msg received");
 }
 
-void EventHandler::handle_speech_options(uint32_t msgtype, shared_ptr<Caps>& msg) {
+void EventHandler::handle_speech_options(shared_ptr<Caps>& msg) {
   int32_t v;
   int32_t v2;
   shared_ptr<SpeechOptions> opts = SpeechOptions::new_instance();
@@ -202,18 +203,18 @@ void EventHandler::handle_speech_options(uint32_t msgtype, shared_ptr<Caps>& msg
   return;
 
 msg_invalid:
-  KLOGW(TAG, "invalid %s msg received", named_handler[1].event);
+  KLOGW(TAG, "invalid rokid.speech.options msg received");
 }
 
-void EventHandler::handle_speech_stack(uint32_t msgtype, shared_ptr<Caps>& msg) {
+void EventHandler::handle_speech_stack(shared_ptr<Caps>& msg) {
   if (msg->read_string(speech_stack) != CAPS_SUCCESS) {
-    KLOGW(TAG, "invalid %s msg received", named_handler[2].event);
+    KLOGW(TAG, "invalid rokid.speech.stack msg received");
     return;
   }
   KLOGI(TAG, "recv speech stack %s", speech_stack.c_str());
 }
 
-void EventHandler::handle_turen_start_voice(uint32_t msgtype, shared_ptr<Caps>& msg) {
+void EventHandler::handle_turen_start_voice(shared_ptr<Caps>& msg) {
   VoiceOptions vopts;
   int32_t v;
   int32_t turen_id;
@@ -265,47 +266,71 @@ void EventHandler::handle_turen_start_voice(uint32_t msgtype, shared_ptr<Caps>& 
   }
   speech_id = speech->start_voice(&vopts);
   KLOGI(TAG, "speech start voice, id = %d", speech_id);
-  if (speech_id < 0)
-    post_error(200, -1, turen_id);
-  else
+  if (speech_id < 0) {
+    post_error(nullptr, 200, turen_id);
+    post_completed(turen_id);
+  } else
     pending_voices.push_back(pair<int32_t, int32_t>(turen_id, speech_id));
   voice_mutex.unlock();
   return;
 
 msg_invalid:
-  KLOGW(TAG, "invalid %s msg received", named_handler[3].event);
+  KLOGW(TAG, "invalid rokid.turen.start_voice msg received");
 }
 
-void EventHandler::handle_turen_voice(uint32_t msgtype, shared_ptr<Caps>& msg) {
+void EventHandler::handle_turen_voice(shared_ptr<Caps>& msg) {
   string data;
+  int32_t turen_id;
+  int32_t speech_id;
+
   if (msg->read_binary(data) != CAPS_SUCCESS) {
     goto msg_invalid;
   }
-  voice_mutex.lock();
-  if (!pending_voices.empty()) {
+  if (msg->read(turen_id) != CAPS_SUCCESS) {
+    goto msg_invalid;
+  }
+
+  speech_id = get_speech_id(turen_id);
+  if (speech_id < 0)
+    post_completed(turen_id);
+  else {
     // debug
     // write_pcm_file(data);
-    speech->put_voice(pending_voices.back().second,
-        (const uint8_t*)data.data(), data.length());
-  } else
-    KLOGI(TAG, "turen voice discard");
-  voice_mutex.unlock();
+    speech->put_voice(speech_id, (const uint8_t*)data.data(), data.length());
+  }
   return;
 
 msg_invalid:
-  KLOGW(TAG, "invalid %s msg received", named_handler[4].event);
+  KLOGW(TAG, "invalid rokid.turen.voice msg received");
 }
 
-void EventHandler::handle_turen_sleep(uint32_t msgtype, shared_ptr<Caps>& msg) {
+void EventHandler::handle_turen_end_voice(shared_ptr<Caps>& msg) {
+  int32_t turen_id;
+  int32_t speech_id;
+
+  if (msg->read(turen_id) != CAPS_SUCCESS) {
+    goto msg_invalid;
+  }
+  speech_id = get_speech_id(turen_id);
+  KLOGI(TAG, "turen end voice: turen id %d, speech id %d",
+      turen_id, speech_id);
+  if (speech_id > 0)
+    speech->end_voice(speech_id);
+  return;
+
+msg_invalid:
+  KLOGW(TAG, "invalid rokid.turen.end_voice msg received");
+}
+
+void EventHandler::handle_turen_sleep(shared_ptr<Caps>& msg) {
   voice_mutex.lock();
   if (!pending_voices.empty()) {
     speech->end_voice(pending_voices.back().second);
-    // TODO: erase pending voice ? which ? front or back ?
   }
   voice_mutex.unlock();
 }
 
-void EventHandler::handle_speech_put_text(uint32_t msgtype, shared_ptr<Caps>& msg) {
+void EventHandler::handle_speech_put_text(shared_ptr<Caps>& msg) {
   string asr;
   string id;
   VoiceOptions vopts;
@@ -334,14 +359,12 @@ void EventHandler::handle_speech_put_text(uint32_t msgtype, shared_ptr<Caps>& ms
     text_mutex.unlock();
   } else {
     text_mutex.unlock();
-    shared_ptr<flora::Client> cli = flora_cli;
-    if (cli.get())
-      post_error(200, id, custom, -1, flora_cli);
+    post_error(id.c_str(), 200, custom);
   }
   return;
 
 msg_invalid:
-  KLOGW(TAG, "invalid %s msg received", named_handler[6].event);
+  KLOGW(TAG, "invalid rokid.speech.put_text s msg received");
 }
 
 void EventHandler::do_speech_poll() {
@@ -359,150 +382,236 @@ void EventHandler::do_speech_poll() {
 
   while (true) {
     speech->poll(result);
-    voice_mutex.lock();
-    if (!pending_voices.empty())
-      front_req = pending_voices.front();
-    voice_mutex.unlock();
     switch (result.type) {
       case SPEECH_RES_INTER:
         KLOGI(TAG, "speech poll INTER");
-        cli = flora_cli;
-        if (cli.get()) {
-          if (result.asr.length() > 0) {
-            msg = Caps::new_instance();
-            msg->write(result.asr.c_str());
-            msg->write(front_req.first);
-            KLOGI(TAG, "speech post rokid.speech.inter_asr [%d]%s",
-                front_req.first, result.asr.c_str());
-            if (cli->post("rokid.speech.inter_asr", msg, FLORA_MSGTYPE_INSTANT)
-                == FLORA_CLI_ECONN) {
-              KLOGI(TAG, "notify keepalive thread: reconnect flora client");
-              flora_disconnected();
-            }
-          }
-          if (result.extra.length() > 0) {
-            msg = Caps::new_instance();
-            msg->write(result.extra.c_str());
-            msg->write(front_req.first);
-            KLOGI(TAG, "speech post rokid.speech.extra [%d]%s",
-                front_req.first, result.extra.c_str());
-            if (cli->post("rokid.speech.extra", msg, FLORA_MSGTYPE_INSTANT)
-                == FLORA_CLI_ECONN) {
-              KLOGI(TAG, "notify keepalive thread: reconnect flora client");
-              flora_disconnected();
-            }
-          }
+        if (result.asr.length() > 0) {
+          post_inter_asr(result.asr, result.id);
+        }
+        if (result.extra.length() > 0) {
+          post_extra(result.extra, result.id);
         }
         break;
       case SPEECH_RES_ASR_FINISH:
         KLOGI(TAG, "speech poll ASR_FINISH");
-        cli = flora_cli;
-        if (cli.get()) {
-          msg = Caps::new_instance();
-          msg->write(result.asr.c_str());
-          msg->write(front_req.first);
-          KLOGI(TAG, "speech post rokid.speech.final_asr [%d]%s",
-              front_req.first, result.asr.c_str());
-          if (cli->post("rokid.speech.final_asr", msg, FLORA_MSGTYPE_INSTANT)
-              == FLORA_CLI_ECONN) {
-            KLOGI(TAG, "notify keepalive thread: reconnect flora client");
-            flora_disconnected();
-          }
-        }
+        post_inter_asr(result.asr, result.id);
+        if (result.extra.length() > 0)
+          post_extra(result.extra, result.id);
+        post_completed(get_turen_id(result.id));
         break;
       case SPEECH_RES_END:
         KLOGI(TAG, "speech poll END");
+        post_nlp(result.nlp, result.action, result.id);
+        post_completed(get_turen_id(result.id));
+        finish_voice_req(result.id);
         // debug
         // close_pcm_file();
-        cli = flora_cli;
-        if (cli.get()) {
-          string msgname = "rokid.speech.nlp";
-          if (check_pending_texts(result.id, extid, custom)) {
-            msgname.append(".");
-            msgname.append(extid);
-          } else {
-            finish_voice_req(result.id);
-          }
-          msg = Caps::new_instance();
-          msg->write(result.nlp.c_str());
-          msg->write(result.action.c_str());
-          msg->write(custom);
-          msg->write(front_req.first);
-          if (cli->post(msgname.c_str(), msg, FLORA_MSGTYPE_INSTANT)
-              == FLORA_CLI_ECONN) {
-            KLOGI(TAG, "notify keepalive thread: reconnect flora client");
-            flora_disconnected();
-          }
-        }
         break;
       case SPEECH_RES_ERROR:
         KLOGI(TAG, "speech poll ERROR");
         // debug
         // close_pcm_file();
-        post_error((int32_t)result.err, result.id, front_req.first);
+        post_error(result.err, result.id);
+        post_completed(get_turen_id(result.id));
+        finish_voice_req(result.id);
         break;
       case SPEECH_RES_CANCELLED:
         KLOGI(TAG, "speech poll CANCELLED");
+        finish_voice_req(result.id);
         // debug
         // close_pcm_file();
-        cli = flora_cli;
-        if (cli.get()) {
-          string msgname = "rokid.speech.cancel";
-          if (check_pending_texts(result.id, extid, custom)) {
-            msgname.append(".");
-            msgname.append(extid);
-          } else {
-            finish_voice_req(result.id);
-          }
-          msg = Caps::new_instance();
-          msg->write(front_req.first);
-          msg->write(custom);
-          KLOGI(TAG, "speech post rokid.speech.cancel %d",
-              front_req.first);
-          if (cli->post(msgname.c_str(), msg, FLORA_MSGTYPE_INSTANT)
-              == FLORA_CLI_ECONN) {
-            KLOGI(TAG, "notify keepalive thread: reconnect flora client");
-            flora_disconnected();
-          }
-        }
         break;
     }
   }
 }
 
-void EventHandler::post_error(int32_t err, int32_t id, int32_t turen_id) {
-  shared_ptr<flora::Client> cli;
-  string extid;
-  int32_t custom = 0;
-
-  cli = flora_cli;
-  if (cli.get()) {
-    if (!check_pending_texts(id, extid, custom))
-      finish_voice_req(id);
-    post_error(err, extid, custom, turen_id, cli);
-  }
-}
-
-void EventHandler::post_error(int32_t err, const string& extid,
-    int32_t custom, int32_t turen_id, shared_ptr<flora::Client>& cli) {
+void EventHandler::post_error(const char* suffix, int32_t err, int32_t id) {
+  string name = "rokid.speech.error";
+  shared_ptr<flora::Client> cli = flora_cli;
   shared_ptr<Caps> msg;
-  string msgname = "rokid.speech.error";
 
-  if (extid.length() > 0) {
-    msgname.append(".");
-    msgname.append(extid);
+  if (cli.get() == nullptr)
+    return;
+
+  if (suffix) {
+    name.append(".");
+    name.append(suffix);
   }
   msg = Caps::new_instance();
   msg->write(err);
-  msg->write(turen_id);
-  msg->write(custom);
-  KLOGI(TAG, "speech post %s [%d]%d, custom %d", msgname.c_str(),
-      turen_id, err, custom);
-  if (cli->post(msgname.c_str(), msg, FLORA_MSGTYPE_INSTANT)
+  msg->write(id);
+  KLOGI(TAG, "speech post %s: err %d, id %d", name.c_str(), err, id);
+  if (cli->post(name.c_str(), msg, FLORA_MSGTYPE_INSTANT)
       == FLORA_CLI_ECONN) {
     KLOGI(TAG, "notify keepalive thread: reconnect flora client");
     flora_disconnected();
   }
+}
+
+void EventHandler::post_error(int32_t err, int32_t speech_id) {
+  unique_lock<mutex> voice_locker(voice_mutex);
+  if (!pending_voices.empty()) {
+    pair<int32_t, int32_t> front_req = pending_voices.back();
+    if (front_req.second == speech_id) {
+      post_error(nullptr, err, front_req.first);
+      return;
+    }
+  }
+  voice_locker.unlock();
+
+  string msgid;
+  int32_t custom;
+  if (check_pending_texts(speech_id, msgid, custom)) {
+    post_error(msgid.c_str(), err, custom);
+  }
+}
+
+void EventHandler::post_completed(int32_t turen_id) {
+  lock_guard<mutex> locker(completed_mutex);
+  shared_ptr<flora::Client> cli = flora_cli;
+  shared_ptr<Caps> msg;
+  int32_t r;
+
+  if (turen_id < 0)
+    return;
+  KLOGI(TAG, "post completed: turen id %d/%d", turen_id, lastest_completed_id);
+  if (lastest_completed_id == turen_id)
+    return;
+  if (cli.get()) {
+    msg = Caps::new_instance();
+    msg->write(turen_id);
+    r = cli->post("rokid.speech.completed", msg, FLORA_MSGTYPE_INSTANT);
+    if (r == FLORA_CLI_SUCCESS)
+      lastest_completed_id = turen_id;
+    if (r == FLORA_CLI_ECONN) {
+      KLOGI(TAG, "notify keepalive thread: reconnect flora client");
+      flora_disconnected();
+    }
+  }
+}
+
+void EventHandler::post_inter_asr(const string& asr, int32_t speech_id) {
+  shared_ptr<flora::Client> cli = flora_cli;
+  shared_ptr<Caps> msg;
+  int32_t turen_id;
+
+  if (cli.get()) {
+    turen_id = get_turen_id(speech_id);
+    if (turen_id > 0) {
+      KLOGI(TAG, "post inter asr %d-%s", turen_id, asr.c_str());
+      msg = Caps::new_instance();
+      msg->write(asr.c_str());
+      msg->write(turen_id);
+      if (cli->post("rokid.speech.inter_asr", msg, FLORA_MSGTYPE_INSTANT)
+          == FLORA_CLI_ECONN) {
+        KLOGI(TAG, "notify keepalive thread: reconnect flora client");
+        flora_disconnected();
+      }
+    }
+  }
+}
+
+void EventHandler::post_extra(const string& extra, int32_t speech_id) {
+  shared_ptr<flora::Client> cli = flora_cli;
+  shared_ptr<Caps> msg;
+  int32_t turen_id;
+
+  if (cli.get()) {
+    turen_id = get_turen_id(speech_id);
+    if (turen_id > 0) {
+      KLOGI(TAG, "post extra %d-%s", turen_id, extra.c_str());
+      msg = Caps::new_instance();
+      msg->write(extra.c_str());
+      msg->write(turen_id);
+      if (cli->post("rokid.speech.extra", msg, FLORA_MSGTYPE_INSTANT)
+          == FLORA_CLI_ECONN) {
+        KLOGI(TAG, "notify keepalive thread: reconnect flora client");
+        flora_disconnected();
+      }
+    }
+  }
+}
+
+void EventHandler::post_final_asr(const string& asr, int32_t speech_id) {
+  shared_ptr<flora::Client> cli = flora_cli;
+  shared_ptr<Caps> msg;
+  int32_t turen_id;
+
+  if (cli.get()) {
+    turen_id = get_turen_id(speech_id);
+    if (turen_id > 0) {
+      KLOGI(TAG, "post final asr %d-%s", turen_id, asr.c_str());
+      msg = Caps::new_instance();
+      msg->write(asr.c_str());
+      msg->write(turen_id);
+      if (cli->post("rokid.speech.final_asr", msg, FLORA_MSGTYPE_INSTANT)
+          == FLORA_CLI_ECONN) {
+        KLOGI(TAG, "notify keepalive thread: reconnect flora client");
+        flora_disconnected();
+      }
+    }
+  }
+}
+
+void EventHandler::post_nlp(const char* suffix, const string& nlp,
+    const string& action, int32_t id) {
+  shared_ptr<flora::Client> cli = flora_cli;
+  shared_ptr<Caps> msg;
+  string name = "rokid.speech.nlp";
+
+  if (cli.get()) {
+    if (suffix) {
+      name.append(".");
+      name.append(suffix);
+    }
+    KLOGI(TAG, "post %s %d-%s", name.c_str(), id, nlp.c_str());
+    msg = Caps::new_instance();
+    msg->write(nlp.c_str());
+    msg->write(action.c_str());
+    msg->write(id);
+    if (cli->post(name.c_str(), msg, FLORA_MSGTYPE_INSTANT)
+        == FLORA_CLI_ECONN) {
+      KLOGI(TAG, "notify keepalive thread: reconnect flora client");
+      flora_disconnected();
+    }
+  }
+}
+
+void EventHandler::post_nlp(const string& nlp, const string& action,
+    int32_t speech_id) {
+  unique_lock<mutex> voice_locker(voice_mutex);
+  if (!pending_voices.empty()) {
+    pair<int32_t, int32_t> front_req = pending_voices.back();
+    if (front_req.second == speech_id) {
+      post_nlp(nullptr, nlp, action, front_req.first);
+      return;
+    }
+  }
+  voice_locker.unlock();
+
+  string msgid;
+  int32_t custom;
+  if (check_pending_texts(speech_id, msgid, custom)) {
+    post_nlp(msgid.c_str(), nlp, action, custom);
+  }
+}
+
+int32_t EventHandler::get_turen_id(int32_t speech_id) {
+  lock_guard<mutex> locker(voice_mutex);
+  if (pending_voices.empty())
+    return -1;
+  if (pending_voices.front().second == speech_id)
+    return pending_voices.front().first;
+  return -1;
+}
+
+int32_t EventHandler::get_speech_id(int32_t turen_id) {
+  lock_guard<mutex> locker(voice_mutex);
+  if (pending_voices.empty())
+    return -1;
+  if (pending_voices.front().first == turen_id)
+    return pending_voices.front().second;
+  return -1;
 }
 
 bool EventHandler::check_pending_texts(int32_t id, string& extid, int32_t& custom) {
@@ -552,4 +661,33 @@ void EventHandler::flora_disconnected() {
 void EventHandler::disconnected() {
   thread tmp([this]() { this->flora_disconnected(); });
   tmp.detach();
+}
+
+void EventHandler::flora_keepalive(CmdlineArgs& args) {
+	shared_ptr<flora::Client> cli;
+	int32_t r;
+	unique_lock<mutex> locker(reconn_mutex);
+
+	while (true) {
+		r = flora::Client::connect(args.flora_uri.c_str(), this,
+				args.flora_bufsize, cli);
+		if (r != FLORA_CLI_SUCCESS) {
+			KLOGI(TAG, "connect to flora service %s failed, retry after %u milliseconds",
+					args.flora_uri.c_str(), args.flora_reconn_interval.count());
+			reconn_cond.wait_for(locker, args.flora_reconn_interval);
+		} else {
+			KLOGI(TAG, "flora service %s connected", args.flora_uri.c_str());
+			subscribe_events(cli);
+      flora_cli = cli;
+			reconn_cond.wait(locker);
+		}
+	}
+}
+
+void EventHandler::subscribe_events(shared_ptr<flora::Client>& cli) {
+  EventHandlerMap::iterator it;
+
+	for (it = handlers.begin(); it != handlers.end(); ++it) {
+		cli->subscribe((*it).first.name.c_str(), (*it).first.type);
+	}
 }
