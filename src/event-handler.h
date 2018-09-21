@@ -93,5 +93,6 @@ public:
   std::list<TextReqInfo> pending_texts;
   std::mutex completed_mutex;
   int32_t lastest_completed_id = 0;
+  std::string lastest_speech_file;
   bool speech_prepared = false;
 };

@@ -1,3 +1,7 @@
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <fcntl.h>
+#include <unistd.h>
 #include <thread>
 #include "event-handler.h"
 #include "defs.h"
@@ -5,23 +9,20 @@
 #include "speech.h"
 #include "uri.h"
 
-// debug
-// #include <sys/types.h>
-// #include <sys/stat.h>
-// #include <fcntl.h>
-// #include <unistd.h>
-
 #define DEFAULT_SPEECH_URI "wss://apigwws.open.rokid.com:443/api"
 
 using namespace std;
 using namespace rokid;
 using namespace rokid::speech;
 
-// debug
-/**
 static int pcm_file = -1;
-void open_pcm_file() {
-  pcm_file = open("/data/speech-service.pcm", O_CREAT | O_WRONLY | O_TRUNC);
+void open_pcm_file(const string& file) {
+  if (file.length() > 0) {
+    pcm_file = open(file.c_str(), O_CREAT | O_WRONLY | O_TRUNC);
+    if (pcm_file < 0) {
+      KLOGW(TAG, "lastest speech file %s open failed", file.c_str());
+    }
+  }
 }
 
 void write_pcm_file(string& data) {
@@ -36,10 +37,11 @@ void close_pcm_file() {
     pcm_file = -1;
   }
 }
-*/
 
 void EventHandler::init(CmdlineArgs& args) {
   FloraMsgInfo key;
+
+  lastest_speech_file = args.lastest_speech_file;
 
   key.name = "rokid.speech.prepare_options";
   key.type = FLORA_MSGTYPE_PERSIST;
@@ -78,8 +80,11 @@ void EventHandler::recv_post(const char* name, uint32_t msgtype,
   FloraMsgInfo key;
   key.name = name;
   key.type = msgtype;
+  KLOGI(TAG, "recv_post *a*");
   EventHandlerMap::iterator it = handlers.find(key);
+  KLOGI(TAG, "recv_post *b*");
   it->second(msg);
+  KLOGI(TAG, "recv_post *c*");
 }
 
 void EventHandler::handle_speech_prepare_options(shared_ptr<Caps>& msg) {
@@ -220,8 +225,7 @@ void EventHandler::handle_turen_start_voice(shared_ptr<Caps>& msg) {
   int32_t turen_id;
   int32_t speech_id;
 
-  // debug
-  // open_pcm_file();
+  open_pcm_file(lastest_speech_file);
 
   vopts.stack = speech_stack;
   KLOGI(TAG, "stack %s", speech_stack.c_str());
@@ -294,8 +298,7 @@ void EventHandler::handle_turen_voice(shared_ptr<Caps>& msg) {
   if (speech_id < 0)
     post_completed(turen_id);
   else {
-    // debug
-    // write_pcm_file(data);
+    write_pcm_file(data);
     speech->put_voice(speech_id, (const uint8_t*)data.data(), data.length());
   }
   return;
@@ -404,13 +407,11 @@ void EventHandler::do_speech_poll() {
         post_nlp(result.nlp, result.action, result.id);
         post_completed(get_turen_id(result.id));
         finish_voice_req(result.id);
-        // debug
-        // close_pcm_file();
+        close_pcm_file();
         break;
       case SPEECH_RES_ERROR:
         KLOGI(TAG, "speech poll ERROR");
-        // debug
-        // close_pcm_file();
+        close_pcm_file();
         post_error(result.err, result.id);
         post_completed(get_turen_id(result.id));
         finish_voice_req(result.id);
@@ -418,8 +419,7 @@ void EventHandler::do_speech_poll() {
       case SPEECH_RES_CANCELLED:
         KLOGI(TAG, "speech poll CANCELLED");
         finish_voice_req(result.id);
-        // debug
-        // close_pcm_file();
+        close_pcm_file();
         break;
     }
   }

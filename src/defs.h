@@ -15,4 +15,5 @@ public:
 	std::string flora_uri = "unix:flora-dispatcher-socket#" TAG;
 	std::chrono::milliseconds flora_reconn_interval;
   int32_t log_service_port = 0;
+  std::string lastest_speech_file;
 };

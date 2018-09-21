@@ -24,6 +24,7 @@ static void print_prompt(const char* progname) {
 		"\t--flora-bufsize=*    flora消息缓冲区大小\n"
 		"\t--flora-reconn-interval=*    flora服务重连时间间隔(ms)\n"
 		"\t--log-service-port=*    log服务端口\n"
+		"\t--lastest-speech-file=*    保存最近一次speech语音数据至指定文件\n"
 		;
 	KLOGI(TAG, prompt, progname);
 }
@@ -64,6 +65,10 @@ static bool parse_cmdline(clargs_h h, CmdlineArgs& res) {
 			if (ep[0] != '\0')
 				goto invalid_option;
 			res.log_service_port = iv;
+		} else if (strcmp(key, "lastest-speech-file") == 0) {
+			if (val[0] == '\0')
+				goto invalid_option;
+			res.lastest_speech_file = val;
 		} else
 			goto invalid_option;
 	}
