@@ -18,7 +18,7 @@ using namespace rokid::speech;
 static int pcm_file = -1;
 void open_pcm_file(const string& file) {
   if (file.length() > 0) {
-    pcm_file = open(file.c_str(), O_CREAT | O_WRONLY | O_TRUNC);
+    pcm_file = open(file.c_str(), O_CREAT | O_WRONLY | O_TRUNC, 0644);
     if (pcm_file < 0) {
       KLOGW(TAG, "lastest speech file %s open failed", file.c_str());
     }
