@@ -80,11 +80,8 @@ void EventHandler::recv_post(const char* name, uint32_t msgtype,
   FloraMsgInfo key;
   key.name = name;
   key.type = msgtype;
-  KLOGI(TAG, "recv_post *a*");
   EventHandlerMap::iterator it = handlers.find(key);
-  KLOGI(TAG, "recv_post *b*");
   it->second(msg);
-  KLOGI(TAG, "recv_post *c*");
 }
 
 void EventHandler::handle_speech_prepare_options(shared_ptr<Caps>& msg) {
@@ -142,6 +139,11 @@ void EventHandler::handle_speech_prepare_options(shared_ptr<Caps>& msg) {
   popts.host = uri_parser.host;
   popts.port = uri_parser.port;
   popts.branch = uri_parser.path;
+  if (speech_prepared) {
+    speech->prepare(popts);
+    speech->reconn();
+    return;
+  }
   speech_mutex.lock();
   speech->prepare(popts);
   speech_prepared = true;
@@ -204,6 +206,11 @@ void EventHandler::handle_speech_options(shared_ptr<Caps>& msg) {
     opts->set_vad_begin(v);
     KLOGI(TAG, "recv speech options: vad begin = %d", v);
   }
+  if (msg->read(v) != CAPS_SUCCESS) {
+    goto msg_invalid;
+  }
+  KLOGI(TAG, "recv speech options: voice fragment = %u", (uint32_t)v);
+  opts->set_voice_fragment((uint32_t)v);
   speech->config(opts);
   return;
 
