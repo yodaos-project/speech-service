@@ -404,7 +404,7 @@ void EventHandler::do_speech_poll() {
         break;
       case SPEECH_RES_ASR_FINISH:
         KLOGI(TAG, "speech poll ASR_FINISH");
-        post_inter_asr(result.asr, result.id);
+        post_final_asr(result.asr, result.id);
         if (result.extra.length() > 0)
           post_extra(result.extra, result.id);
         post_completed(get_turen_id(result.id));
