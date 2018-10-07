@@ -302,9 +302,9 @@ void EventHandler::handle_turen_voice(shared_ptr<Caps>& msg) {
   }
 
   speech_id = get_speech_id(turen_id);
-  if (speech_id < 0)
+  if (speech_id < 0) {
     post_completed(turen_id);
-  else {
+  } else {
     write_pcm_file(data);
     speech->put_voice(speech_id, (const uint8_t*)data.data(), data.length());
   }
@@ -458,7 +458,7 @@ void EventHandler::post_error(const char* suffix, int32_t err, int32_t id) {
 void EventHandler::post_error(int32_t err, int32_t speech_id) {
   unique_lock<mutex> voice_locker(voice_mutex);
   if (!pending_voices.empty()) {
-    pair<int32_t, int32_t> front_req = pending_voices.back();
+    pair<int32_t, int32_t> front_req = pending_voices.front();
     if (front_req.second == speech_id) {
       post_error(nullptr, err, front_req.first);
       return;
@@ -588,7 +588,7 @@ void EventHandler::post_nlp(const string& nlp, const string& action,
     int32_t speech_id) {
   unique_lock<mutex> voice_locker(voice_mutex);
   if (!pending_voices.empty()) {
-    pair<int32_t, int32_t> front_req = pending_voices.back();
+    pair<int32_t, int32_t> front_req = pending_voices.front();
     if (front_req.second == speech_id) {
       post_nlp(nullptr, nlp, action, front_req.first);
       return;
@@ -616,7 +616,7 @@ int32_t EventHandler::get_speech_id(int32_t turen_id) {
   lock_guard<mutex> locker(voice_mutex);
   if (pending_voices.empty())
     return -1;
-  if (pending_voices.front().first == turen_id)
+  if (pending_voices.back().first == turen_id)
     return pending_voices.front().second;
   return -1;
 }
