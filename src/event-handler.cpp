@@ -351,6 +351,9 @@ void EventHandler::handle_speech_put_text(shared_ptr<Caps>& msg) {
   if (msg->read_string(asr) != CAPS_SUCCESS) {
     goto msg_invalid;
   }
+  if (msg->read_string(vopts.skill_options) != CAPS_SUCCESS) {
+    goto msg_invalid;
+  }
   if (msg->read_string(id) != CAPS_SUCCESS) {
     goto msg_invalid;
   }
@@ -358,7 +361,8 @@ void EventHandler::handle_speech_put_text(shared_ptr<Caps>& msg) {
     goto msg_invalid;
   }
   vopts.stack = speech_stack;
-  // TODO: set skill options
+  KLOGI(TAG, "put text %s with skill options %s", asr.c_str(),
+      vopts.skill_options.c_str());
   text_mutex.lock();
   sid = speech->put_text(asr.c_str(), &vopts);
   if (sid > 0) {
