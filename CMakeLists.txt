@@ -42,6 +42,14 @@ findPackage(flora REQUIRED
 	SHARED_LIBS flora-cli
 )
 
+if (COMPILER_IS_CLANG)
+findPackage(speech REQUIRED
+	HINTS ${speechPrefix}
+	HEADERS speech.h
+	INC_PATH_SUFFIX include/speech
+	SHARED_LIBS speech
+)
+else()
 findPackage(speech REQUIRED
 	HINTS ${speechPrefix}
 	HEADERS speech.h
@@ -49,6 +57,7 @@ findPackage(speech REQUIRED
 	SHARED_LIBS speech
 	RPATH_LINK
 )
+endif()
 
 file(GLOB ss_src_files
 	src/*.cpp
