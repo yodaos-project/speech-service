@@ -625,7 +625,7 @@ int32_t EventHandler::get_speech_id(int32_t turen_id) {
   if (pending_voices.empty())
     return -1;
   if (pending_voices.back().first == turen_id)
-    return pending_voices.front().second;
+    return pending_voices.back().second;
   return -1;
 }
 
