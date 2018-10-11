@@ -16,25 +16,29 @@ using namespace rokid;
 using namespace rokid::speech;
 
 static int pcm_file = -1;
-void open_pcm_file(const string& file) {
+static int32_t pcm_speech_id = -1;
+void open_pcm_file(const string& file, int32_t id) {
   if (file.length() > 0) {
     pcm_file = open(file.c_str(), O_CREAT | O_WRONLY | O_TRUNC, 0644);
     if (pcm_file < 0) {
       KLOGW(TAG, "lastest speech file %s open failed", file.c_str());
+    } else {
+      pcm_speech_id = id;
     }
   }
 }
 
-void write_pcm_file(string& data) {
-  if (pcm_file >= 0) {
+void write_pcm_file(string& data, int32_t id) {
+  if (pcm_file >= 0 && id == pcm_speech_id) {
     write(pcm_file, data.data(), data.length());
   }
 }
 
-void close_pcm_file() {
-  if (pcm_file >= 0) {
+void close_pcm_file(int32_t id) {
+  if (pcm_file >= 0 && id == pcm_speech_id) {
     ::close(pcm_file);
     pcm_file = -1;
+    pcm_speech_id = -1;
   }
 }
 
@@ -232,8 +236,6 @@ void EventHandler::handle_turen_start_voice(shared_ptr<Caps>& msg) {
   int32_t turen_id;
   int32_t speech_id;
 
-  open_pcm_file(lastest_speech_file);
-
   vopts.stack = speech_stack;
   KLOGI(TAG, "stack %s", speech_stack.c_str());
   if (msg->read_string(vopts.voice_trigger) != CAPS_SUCCESS) {
@@ -274,8 +276,10 @@ void EventHandler::handle_turen_start_voice(shared_ptr<Caps>& msg) {
     int32_t cid = pending_voices.back().second;
     KLOGI(TAG, "speech cancel, id = %d", cid);
     speech->cancel(cid);
+    close_pcm_file(cid);
   }
   speech_id = speech->start_voice(&vopts);
+  open_pcm_file(lastest_speech_file, speech_id);
   KLOGI(TAG, "speech start voice, id = %d", speech_id);
   if (speech_id < 0) {
     post_error(nullptr, 200, turen_id);
@@ -305,7 +309,7 @@ void EventHandler::handle_turen_voice(shared_ptr<Caps>& msg) {
   if (speech_id < 0) {
     post_completed(turen_id);
   } else {
-    write_pcm_file(data);
+    write_pcm_file(data, speech_id);
     speech->put_voice(speech_id, (const uint8_t*)data.data(), data.length());
   }
   return;
@@ -418,11 +422,11 @@ void EventHandler::do_speech_poll() {
         post_nlp(result.nlp, result.action, result.id);
         post_completed(get_turen_id(result.id));
         finish_voice_req(result.id);
-        close_pcm_file();
+        close_pcm_file(result.id);
         break;
       case SPEECH_RES_ERROR:
         KLOGI(TAG, "speech poll ERROR");
-        close_pcm_file();
+        close_pcm_file(result.id);
         post_error(result.err, result.id);
         post_completed(get_turen_id(result.id));
         finish_voice_req(result.id);
@@ -430,7 +434,7 @@ void EventHandler::do_speech_poll() {
       case SPEECH_RES_CANCELLED:
         KLOGI(TAG, "speech poll CANCELLED");
         finish_voice_req(result.id);
-        close_pcm_file();
+        close_pcm_file(result.id);
         break;
     }
   }
