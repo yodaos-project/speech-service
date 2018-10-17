@@ -703,6 +703,6 @@ void EventHandler::subscribe_events(shared_ptr<flora::Client>& cli) {
   EventHandlerMap::iterator it;
 
 	for (it = handlers.begin(); it != handlers.end(); ++it) {
-		cli->subscribe((*it).first.name.c_str(), (*it).first.type);
+		cli->subscribe((*it).first.name.c_str());
 	}
 }
