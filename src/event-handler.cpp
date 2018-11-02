@@ -85,7 +85,8 @@ void EventHandler::recv_post(const char* name, uint32_t msgtype,
   key.name = name;
   key.type = msgtype;
   EventHandlerMap::iterator it = handlers.find(key);
-  it->second(msg);
+  if (it != handlers.end())
+    it->second(msg);
 }
 
 void EventHandler::handle_speech_prepare_options(shared_ptr<Caps>& msg) {
