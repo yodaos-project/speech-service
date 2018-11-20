@@ -89,6 +89,17 @@ void EventHandler::recv_post(const char* name, uint32_t msgtype,
     it->second(msg);
 }
 
+static bool caps_read_int32(shared_ptr<Caps>& caps, int32_t& r) {
+  double dv;
+
+  if (caps->read(r) != CAPS_SUCCESS) {
+    if (caps->read(dv) != CAPS_SUCCESS)
+      return false;
+    r = (int32_t)dv;
+  }
+  return true;
+}
+
 void EventHandler::handle_speech_prepare_options(shared_ptr<Caps>& msg) {
   string uri;
   PrepareOptions popts;
@@ -116,21 +127,21 @@ void EventHandler::handle_speech_prepare_options(shared_ptr<Caps>& msg) {
     goto msg_invalid;
   }
   KLOGI(TAG, "recv prepare options: device id = %s", popts.device_id.c_str());
-  if (msg->read(v) != CAPS_SUCCESS) {
+  if (!caps_read_int32(msg, v)) {
     goto msg_invalid;
   }
   if (v > 0) {
     popts.reconn_interval = v;
     KLOGI(TAG, "recv prepare options: reconn interval = %d", v);
   }
-  if (msg->read(v) != CAPS_SUCCESS) {
+  if (!caps_read_int32(msg, v)) {
     goto msg_invalid;
   }
   if (v > 0) {
     popts.ping_interval = v;
     KLOGI(TAG, "recv prepare options: ping interval = %d", v);
   }
-  if (msg->read(v) != CAPS_SUCCESS) {
+  if (!caps_read_int32(msg, v)) {
     goto msg_invalid;
   }
   if (v > 0) {
@@ -165,53 +176,52 @@ void EventHandler::handle_speech_options(shared_ptr<Caps>& msg) {
   int32_t v2;
   shared_ptr<SpeechOptions> opts = SpeechOptions::new_instance();
 
-
-  if (msg->read(v) != CAPS_SUCCESS) {
+  if (!caps_read_int32(msg, v)) {
     goto msg_invalid;
   }
   if (v >= 0) {
     opts->set_lang((Lang)v);
     KLOGI(TAG, "recv speech options: lang = %d", v);
   }
-  if (msg->read(v) != CAPS_SUCCESS) {
+  if (!caps_read_int32(msg, v)) {
     goto msg_invalid;
   }
   if (v >= 0) {
     opts->set_codec((Codec)v);
     KLOGI(TAG, "recv speech options: codec = %d", v);
   }
-  if (msg->read(v) != CAPS_SUCCESS) {
+  if (!caps_read_int32(msg, v)) {
     goto msg_invalid;
   }
-  if (msg->read(v2) != CAPS_SUCCESS) {
+  if (!caps_read_int32(msg, v2)) {
     goto msg_invalid;
   }
   if (v >= 0) {
     opts->set_vad_mode((VadMode)v, v2);
     KLOGI(TAG, "recv speech options: vad mode = %d, timeout = %d", v, v2);
   }
-  if (msg->read(v) != CAPS_SUCCESS) {
+  if (!caps_read_int32(msg, v)) {
     goto msg_invalid;
   }
   if (v >= 0) {
     opts->set_no_nlp(v);
     KLOGI(TAG, "recv speech options: no nlp = %d", v);
   }
-  if (msg->read(v) != CAPS_SUCCESS) {
+  if (!caps_read_int32(msg, v)) {
     goto msg_invalid;
   }
   if (v >= 0) {
     opts->set_no_intermediate_asr(v);
     KLOGI(TAG, "recv speech options: no intermediate asr = %d", v);
   }
-  if (msg->read(v) != CAPS_SUCCESS) {
+  if (!caps_read_int32(msg, v)) {
     goto msg_invalid;
   }
   if (v >= 0) {
     opts->set_vad_begin(v);
     KLOGI(TAG, "recv speech options: vad begin = %d", v);
   }
-  if (msg->read(v) != CAPS_SUCCESS) {
+  if (!caps_read_int32(msg, v)) {
     goto msg_invalid;
   }
   KLOGI(TAG, "recv speech options: voice fragment = %u", (uint32_t)v);
@@ -362,7 +372,7 @@ void EventHandler::handle_speech_put_text(shared_ptr<Caps>& msg) {
   if (msg->read_string(id) != CAPS_SUCCESS) {
     goto msg_invalid;
   }
-  if (msg->read(custom) != CAPS_SUCCESS) {
+  if (!caps_read_int32(msg, custom)) {
     goto msg_invalid;
   }
   vopts.stack = speech_stack;
