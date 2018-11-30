@@ -32,79 +32,68 @@ static void print_prompt(const char* progname) {
 
 void run(CmdlineArgs& args);
 
-static bool parse_cmdline(clargs_h h, CmdlineArgs& res) {
-	const char* key;
-	const char* val;
-	char* ep;
-	long iv;
+static bool parse_cmdline(shared_ptr<CLArgs>& h, CmdlineArgs& res) {
+  int32_t iv;
+  uint32_t sz = h->size();
+  uint32_t i;
+  CLPair pair;
 
-	while (clargs_opt_next(h, &key, &val) == 0) {
-		if (strcmp(key, "flora-bufsize") == 0) {
-			if (val[0] == '\0')
-				goto invalid_option;
-			iv = strtol(val, &ep, 10);
-			if (ep[0] != '\0')
+  for (i = 1; i < sz; ++i) {
+    h->at(i, pair);
+		if (pair.match("flora-bufsize")) {
+      if (!pair.to_integer(iv))
 				goto invalid_option;
 			res.flora_bufsize = iv;
-		} else if (strcmp(key, "flora-uri") == 0) {
-			if (val[0] == '\0')
+		} else if (pair.match("flora-uri")) {
+			if (pair.value == nullptr || pair.value[0] == '\0')
 				goto invalid_option;
-			res.flora_uri = val;
+			res.flora_uri = pair.value;
 			res.flora_uri.append("#");
 			res.flora_uri.append(TAG);
-		} else if (strcmp(key, "flora-reconn-interval") == 0) {
-			if (val[0] == '\0')
-				goto invalid_option;
-			iv = strtol(val, &ep, 10);
-			if (ep[0] != '\0')
+		} else if (pair.match("flora-reconn-interval")) {
+      if (!pair.to_integer(iv))
 				goto invalid_option;
 			res.flora_reconn_interval = milliseconds(iv);
-		} else if (strcmp(key, "log-service-port") == 0) {
-			if (val[0] == '\0')
-				goto invalid_option;
-			iv = strtol(val, &ep, 10);
-			if (ep[0] != '\0')
+		} else if (pair.match("log-service-port")) {
+      if (!pair.to_integer(iv))
 				goto invalid_option;
 			res.log_service_port = iv;
-		} else if (strcmp(key, "lastest-speech-file") == 0) {
-			if (val[0] == '\0')
+		} else if (pair.match("lastest-speech-file")) {
+			if (pair.value == nullptr || pair.value[0] == '\0')
 				goto invalid_option;
-			res.lastest_speech_file = val;
-		} else if (strcmp(key, "skillopt-pro") == 0) {
-			if (val[0] == '\0')
+			res.lastest_speech_file = pair.value;
+		} else if (pair.match("skillopt-pro")) {
+			if (pair.value == nullptr || pair.value[0] == '\0')
 				goto invalid_option;
-			res.skilloptions_provider = val;
+			res.skilloptions_provider = pair.value;
 		} else
 			goto invalid_option;
 	}
 	return true;
 
 invalid_option:
-	if (val[0])
-		KLOGE(TAG, "invalid option: --%s=%s", key, val);
+	if (pair.value)
+		KLOGE(TAG, "invalid option: --%s=%s", pair.key, pair.value);
 	else
-		KLOGE(TAG, "invalid option: --%s", key);
+		KLOGE(TAG, "invalid option: --%s", pair.key);
 	return false;
 }
 
 int main(int argc, char** argv) {
-	clargs_h h = clargs_parse(argc, argv);
-	if (!h || clargs_opt_has(h, "help")) {
-		clargs_destroy(h);
+  shared_ptr<CLArgs> h = CLArgs::parse(argc, argv);
+	if (h == nullptr || h->find("help", nullptr, nullptr)) {
 		print_prompt(argv[0]);
 		return 0;
 	}
-	if (clargs_opt_has(h, "version")) {
-		clargs_destroy(h);
+	if (h->find("version", nullptr, nullptr)) {
 		KLOGI(TAG, "git commit id: %s", MACRO_TO_STRING(GIT_COMMIT_ID));
 		return 0;
 	}
 	CmdlineArgs cmdargs;
 	if (!parse_cmdline(h, cmdargs)) {
-		clargs_destroy(h);
 		return 1;
 	}
-	clargs_destroy(h);
+  h.reset();
 
 	run(cmdargs);
 	return 0;
