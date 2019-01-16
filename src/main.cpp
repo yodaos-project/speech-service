@@ -1,11 +1,11 @@
-#include <string.h>
-#include <stdlib.h>
-#include <stdio.h>
-#include "flora-svc.h"
 #include "clargs.h"
-#include "rlog.h"
 #include "defs.h"
-#include "event-handler.h"
+#include "flora-svc.h"
+#include "rlog.h"
+#include "speech-service.h"
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
 
 #define MACRO_TO_STRING(x) MACRO_TO_STRING1(x)
 #define MACRO_TO_STRING1(x) #x
@@ -14,25 +14,24 @@ using namespace flora;
 using namespace std;
 using namespace std::chrono;
 
-static void print_prompt(const char* progname) {
-  static const char* prompt =
-    "USAGE: %s [options]\n"
-    "options:\n"
-    "\t--help    打印帮助信息\n"
-    "\t--version    版本号\n"
-    "\t--flora-uri=*    flora服务uri\n"
-    "\t--flora-bufsize=*    flora消息缓冲区大小\n"
-    "\t--flora-reconn-interval=*    flora服务重连时间间隔(ms)\n"
-    "\t--log-service-port=*    log服务端口\n"
-    "\t--lastest-speech-file=*    保存最近一次speech语音数据至指定文件\n"
-    "\t--skillopt-pro=*    skilloptions provider的flora名称\n"
-    ;
+static void print_prompt(const char *progname) {
+  static const char *prompt =
+      "USAGE: %s [options]\n"
+      "options:\n"
+      "\t--help    打印帮助信息\n"
+      "\t--version    版本号\n"
+      "\t--flora-uri=*    flora服务uri\n"
+      "\t--flora-bufsize=*    flora消息缓冲区大小\n"
+      "\t--flora-reconn-interval=*    flora服务重连时间间隔(ms)\n"
+      "\t--log-service-port=*    log服务端口\n"
+      "\t--lastest-speech-file=*    保存最近一次speech语音数据至指定文件\n"
+      "\t--skillopt-pro=*    skilloptions provider的flora名称\n";
   KLOGI(TAG, prompt, progname);
 }
 
-void run(CmdlineArgs& args);
+void run(CmdlineArgs &args);
 
-static bool parse_cmdline(shared_ptr<CLArgs>& h, CmdlineArgs& res) {
+static bool parse_cmdline(shared_ptr<CLArgs> &h, CmdlineArgs &res) {
   int32_t iv;
   uint32_t sz = h->size();
   uint32_t i;
@@ -79,7 +78,7 @@ invalid_option:
   return false;
 }
 
-int main(int argc, char** argv) {
+int main(int argc, char **argv) {
   shared_ptr<CLArgs> h = CLArgs::parse(argc, argv);
   if (h == nullptr || h->find("help", nullptr, nullptr)) {
     print_prompt(argv[0]);
@@ -99,7 +98,7 @@ int main(int argc, char** argv) {
   return 0;
 }
 
-void run(CmdlineArgs& args) {
+void run(CmdlineArgs &args) {
   if (args.log_service_port > 0) {
     TCPSocketArg rlogarg;
     rlogarg.host = "0.0.0.0";
@@ -107,6 +106,6 @@ void run(CmdlineArgs& args) {
     rokid_log_ctl(ROKID_LOG_CTL_DEFAULT_ENDPOINT, "tcp-socket", &rlogarg);
   }
 
-  EventHandler event_handler;
-  event_handler.init(args);
+  SpeechService svc;
+  svc.run(args);
 }
