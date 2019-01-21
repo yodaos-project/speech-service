@@ -16,4 +16,5 @@ public:
 	std::chrono::milliseconds flora_reconn_interval;
   int32_t log_service_port = 0;
   std::string lastest_speech_file;
+  std::string skilloptions_provider = "vui";
 };

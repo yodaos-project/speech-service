@@ -25,6 +25,7 @@ static void print_prompt(const char* progname) {
 		"\t--flora-reconn-interval=*    flora服务重连时间间隔(ms)\n"
 		"\t--log-service-port=*    log服务端口\n"
 		"\t--lastest-speech-file=*    保存最近一次speech语音数据至指定文件\n"
+		"\t--skillopt-pro=*    skilloptions provider的flora名称\n"
 		;
 	KLOGI(TAG, prompt, progname);
 }
@@ -69,6 +70,10 @@ static bool parse_cmdline(clargs_h h, CmdlineArgs& res) {
 			if (val[0] == '\0')
 				goto invalid_option;
 			res.lastest_speech_file = val;
+		} else if (strcmp(key, "skillopt-pro") == 0) {
+			if (val[0] == '\0')
+				goto invalid_option;
+			res.skilloptions_provider = val;
 		} else
 			goto invalid_option;
 	}

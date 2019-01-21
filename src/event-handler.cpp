@@ -46,6 +46,11 @@ void EventHandler::init(CmdlineArgs& args) {
   FloraMsgInfo key;
 
   lastest_speech_file = args.lastest_speech_file;
+  skilloptions_provider = args.skilloptions_provider;
+  string tmp_uri = args.flora_uri;
+  tmp_uri.append("0");
+  skilloptions_agent.config(FLORA_AGENT_CONFIG_URI, tmp_uri.c_str());
+  skilloptions_agent.start();
 
   key.name = "rokid.speech.prepare_options";
   key.type = FLORA_MSGTYPE_PERSIST;
@@ -280,7 +285,8 @@ void EventHandler::handle_turen_start_voice(shared_ptr<Caps>& msg) {
     goto msg_invalid;
   }
   KLOGI(TAG, "recv turen start_voice: turen id = %d", turen_id);
-  // TODO: get skill options
+  get_skilloptions(vopts.skill_options);
+  KLOGI(TAG, "skilloptions: %s", vopts.skill_options.c_str());
 
   voice_mutex.lock();
   if (!pending_voices.empty()) {
@@ -638,6 +644,20 @@ int32_t EventHandler::get_speech_id(int32_t turen_id) {
   if (pending_voices.back().first == turen_id)
     return pending_voices.back().second;
   return -1;
+}
+
+void EventHandler::get_skilloptions(std::string &res) {
+  shared_ptr<Caps> empty;
+  flora::Response resp;
+  int32_t r = skilloptions_agent.call("rokid.skilloptions", empty, skilloptions_provider.c_str(), resp, 1000);
+  if (r == FLORA_CLI_SUCCESS) {
+    if (resp.data == nullptr)
+      r = -401;
+    if (resp.data->read(res) != CAPS_SUCCESS)
+      r = -401;
+  }
+  if (r)
+    KLOGW(TAG, "get skill options failed: %d", r);
 }
 
 bool EventHandler::check_pending_texts(int32_t id, string& extid, int32_t& custom) {
