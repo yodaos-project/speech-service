@@ -7,7 +7,7 @@
 #include <utility>
 #include "defs.h"
 #include "speech.h"
-#include "flora-cli.h"
+#include "flora-agent.h"
 
 class FloraMsgInfo {
 public:
@@ -64,6 +64,7 @@ private:
       int32_t speech_id);
   int32_t get_turen_id(int32_t speech_id);
   int32_t get_speech_id(int32_t turen_id);
+  void get_skilloptions(std::string &res);
 
   // flora msg handlers
   void handle_speech_prepare_options(std::shared_ptr<Caps>& msg);
@@ -94,5 +95,7 @@ public:
   std::mutex completed_mutex;
   int32_t lastest_completed_id = 0;
   std::string lastest_speech_file;
+  std::string skilloptions_provider;
+  flora::Agent skilloptions_agent;
   bool speech_prepared = false;
 };
