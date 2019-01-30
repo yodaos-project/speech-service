@@ -102,7 +102,7 @@ int main(int argc, char** argv) {
 void run(CmdlineArgs& args) {
   if (args.log_service_port > 0) {
     TCPSocketArg rlogarg;
-    rlogarg.host = "0.0.0.0";
+    rlogarg.host = "127.0.0.1";
     rlogarg.port = args.log_service_port;
     rokid_log_ctl(ROKID_LOG_CTL_DEFAULT_ENDPOINT, "tcp-socket", &rlogarg);
   }
