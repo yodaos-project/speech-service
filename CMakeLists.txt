@@ -4,6 +4,7 @@ set(VERSION 0.1)
 
 option(BUILD_DEBUG "debug or release" OFF)
 option(BUILD_DEMO "build demo or not" OFF)
+option(ASR2NLP_WORKAROUND "toggle asr2nlp workaround" OFF)
 
 if (CMAKE_CXX_COMPILER_ID MATCHES "Clang" )
   set(COMPILER_IS_CLANG true)
@@ -27,6 +28,10 @@ include(${CUSTOM_CMAKE_MODULES}/common.mk)
 
 git_commit_id(commit_id ${OVERRIDE_SOURCE_DIR})
 set (CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DGIT_COMMIT_ID=${commit_id}")
+
+if (ASR2NLP_WORKAROUND)
+  set (CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DASR2NLP_WORKAROUND")
+endif()
 
 findPackage(mutils REQUIRED
 	HINTS ${mutilsPrefix}

@@ -13,6 +13,7 @@ Configuration:
     --prefix=PREFIX             install prefix
     --cmake-modules=DIR         directory of cmake modules file exist
     --find-root-path=DIR        root dir for search dependencies libs
+    --asr2nlp-workaround        toggle asr2nlp workaround
 
 Dependencies:
     --mutils=DIR                specify mutils install dir
@@ -52,6 +53,9 @@ do
 			;;
 		--build-demo)
 			CMAKE_ARGS=(${CMAKE_ARGS[@]} -DBUILD_DEMO=ON)
+			;;
+		--asr2nlp-workaround)
+			CMAKE_ARGS=(${CMAKE_ARGS[@]} -DASR2NLP_WORKAROUND=ON)
 			;;
 		--cmake-modules=*)
 			cmake_modules_dir=$conf_optarg
