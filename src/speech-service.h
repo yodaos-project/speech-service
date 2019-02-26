@@ -1,5 +1,6 @@
 #pragma once
 
+#include "caps.h"
 #include "defs.h"
 #include "flora-agent.h"
 #include "speech.h"
@@ -37,6 +38,10 @@ private:
 
   void do_speech_poll();
 
+#ifdef ASR2NLP_WORKAROUND
+  void do_speecht_poll();
+#endif
+
   void post_nlp(const std::string &nlp, const std::string &action, int32_t id);
 
   void post_error(int32_t err, int32_t id);
@@ -67,6 +72,9 @@ private:
 private:
   CmdlineArgs *cmdline_args = nullptr;
   std::shared_ptr<rokid::speech::Speech> speech;
+#ifdef ASR2NLP_WORKAROUND
+  std::shared_ptr<rokid::speech::Speech> speecht;
+#endif
   std::string stack;
   flora::Agent flora_agent;
   flora::Agent skilloptions_agent;

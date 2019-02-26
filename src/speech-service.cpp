@@ -38,6 +38,9 @@ void close_pcm_file(int32_t id) {
 
 SpeechService::SpeechService() {
   speech = Speech::new_instance();
+#ifdef ASR2NLP_WORKAROUND
+  speecht = Speech::new_instance();
+#endif
 }
 
 void SpeechService::run(CmdlineArgs &args) {
@@ -102,6 +105,10 @@ void SpeechService::handle_speech_prepare_options(shared_ptr<Caps> &msg) {
     first_prepare = false;
     std::thread speech_poll_thread([this]() { this->do_speech_poll(); });
     speech_poll_thread.detach();
+#ifdef ASR2NLP_WORKAROUND
+    std::thread speecht_poll_thread([this]() { this->do_speecht_poll(); });
+    speecht_poll_thread.detach();
+#endif
   } else {
     reconn_speech(msg);
   }
@@ -156,6 +163,9 @@ bool SpeechService::init_speech(shared_ptr<Caps> &data) {
   if (!caps_to_prepare_options(data, popts))
     return false;
   speech->prepare(popts);
+#ifdef ASR2NLP_WORKAROUND
+  speecht->prepare(popts);
+#endif
   return true;
 }
 
@@ -165,6 +175,10 @@ void SpeechService::reconn_speech(shared_ptr<Caps> &data) {
     return;
   speech->prepare(popts);
   speech->reconn();
+#ifdef ASR2NLP_WORKAROUND
+  speecht->prepare(popts);
+  speecht->reconn();
+#endif
 }
 
 void SpeechService::handle_speech_options(shared_ptr<Caps> &msg) {
@@ -342,7 +356,11 @@ void SpeechService::handle_asr2nlp(shared_ptr<Caps> &msg,
   KLOGI(TAG, "put text %s with skill options %s", asr.c_str(),
         vopts.skill_options.c_str());
   text_mutex.lock();
+#ifdef ASR2NLP_WORKAROUND
+  sid = speecht->put_text(asr.c_str(), &vopts);
+#else
   sid = speech->put_text(asr.c_str(), &vopts);
+#endif
   if (sid > 0) {
     it = pending_texts.emplace(pending_texts.end());
     (*it).speechid = sid;
@@ -361,7 +379,6 @@ msg_invalid:
 
 void SpeechService::do_speech_poll() {
   SpeechResult result;
-  pair<int32_t, int32_t> front_req;
   int32_t turen_id;
 
   while (true) {
@@ -389,6 +406,13 @@ void SpeechService::do_speech_poll() {
       break;
     case SPEECH_RES_END:
       KLOGI(TAG, "speech poll END");
+#ifdef ASR2NLP_WORKAROUND
+      turen_id = get_turen_id(result.id);
+      post_nlp(result.nlp, result.action, turen_id);
+      post_completed(turen_id);
+      finish_voice_req(result.id);
+      close_pcm_file(result.id);
+#else
       if (!end_pending_texts(result.id, result.nlp, result.action)) {
         turen_id = get_turen_id(result.id);
         post_nlp(result.nlp, result.action, turen_id);
@@ -396,9 +420,17 @@ void SpeechService::do_speech_poll() {
         finish_voice_req(result.id);
         close_pcm_file(result.id);
       }
+#endif
       break;
     case SPEECH_RES_ERROR:
       KLOGI(TAG, "speech poll ERROR");
+#ifdef ASR2NLP_WORKAROUND
+      turen_id = get_turen_id(result.id);
+      close_pcm_file(result.id);
+      post_error(result.err, turen_id);
+      post_completed(turen_id);
+      finish_voice_req(result.id);
+#else
       if (!end_pending_texts(result.id, result.err)) {
         turen_id = get_turen_id(result.id);
         close_pcm_file(result.id);
@@ -406,6 +438,7 @@ void SpeechService::do_speech_poll() {
         post_completed(turen_id);
         finish_voice_req(result.id);
       }
+#endif
       break;
     case SPEECH_RES_CANCELLED:
       KLOGI(TAG, "speech poll CANCELLED");
@@ -415,6 +448,25 @@ void SpeechService::do_speech_poll() {
     }
   }
 }
+
+#ifdef ASR2NLP_WORKAROUND
+void SpeechService::do_speecht_poll() {
+  SpeechResult result;
+  int32_t turen_id;
+
+  while (true) {
+    speecht->poll(result);
+    switch (result.type) {
+    case SPEECH_RES_END:
+      end_pending_texts(result.id, result.nlp, result.action);
+      break;
+    case SPEECH_RES_ERROR:
+      end_pending_texts(result.id, result.err);
+      break;
+    }
+  }
+}
+#endif
 
 void SpeechService::post_nlp(const string &nlp, const string &action,
                              int32_t id) {
