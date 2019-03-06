@@ -100,10 +100,12 @@ int main(int argc, char **argv) {
 
 void run(CmdlineArgs &args) {
   if (args.log_service_port > 0) {
-    TCPSocketArg rlogarg;
-    rlogarg.host = "0.0.0.0";
-    rlogarg.port = args.log_service_port;
-    rokid_log_ctl(ROKID_LOG_CTL_DEFAULT_ENDPOINT, "tcp-socket", &rlogarg);
+    char uri[32];
+    snprintf(uri, sizeof(uri), "tcp://%s:%d/", "0.0.0.0", args.log_service_port);
+    if (RLog::add_endpoint("socket", ROKID_LOGWRITER_SOCKET) == 0) {
+      RLog::enable_endpoint("socket", (void *)uri, true);
+      RLog::remove_endpoint("std");
+    }
   }
 
   SpeechService svc;
