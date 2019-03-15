@@ -155,6 +155,7 @@ static bool caps_to_prepare_options(shared_ptr<Caps> &data,
     return false;
   if (!caps_read_number(data, &popts.no_resp_timeout))
     return false;
+  caps_read_number(data, &popts.conn_duration);
   return true;
 }
 
