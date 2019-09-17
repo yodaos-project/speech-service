@@ -4,6 +4,9 @@
 #include <fcntl.h>
 #include <unistd.h>
 
+#define MAX_PENDING_TTS_REQUEST 16
+#define VBS_PROC_STATUS_TTS_REQUESTING 1
+
 using namespace std;
 using namespace rokid;
 using namespace rokid::speech;
@@ -41,6 +44,7 @@ SpeechService::SpeechService() {
 #ifdef ASR2NLP_WORKAROUND
   speecht = Speech::new_instance();
 #endif
+  tts = Tts::new_instance();
 }
 
 void SpeechService::run(CmdlineArgs &args) {
@@ -89,6 +93,11 @@ void SpeechService::run(CmdlineArgs &args) {
       [this](const char *, shared_ptr<Caps> &msg, shared_ptr<Reply> &reply) {
         this->handle_asr2nlp(msg, reply);
       });
+  flora_agent.declare_method(
+      "yodaos.voice-interface.tts.speak",
+      [this](const char *, shared_ptr<Caps> &msg, shared_ptr<Reply> &reply) {
+        this->handle_speak(msg, reply);
+      });
   string skuri = args.flora_uri;
   skuri.append("0");
   skilloptions_agent.config(FLORA_AGENT_CONFIG_URI, skuri.c_str());
@@ -103,15 +112,21 @@ void SpeechService::handle_speech_prepare_options(shared_ptr<Caps> &msg) {
             "speech sdk initialize failed, may be prepare options invalid");
     }
     first_prepare = false;
-    std::thread speech_poll_thread([this]() { this->do_speech_poll(); });
-    speech_poll_thread.detach();
+    thrpool.push([this]() { do_speech_poll(); });
 #ifdef ASR2NLP_WORKAROUND
-    std::thread speecht_poll_thread([this]() { this->do_speecht_poll(); });
-    speecht_poll_thread.detach();
+    thrpool.push([this]() { do_speecht_poll(); });
 #endif
+    thrpool.push([this]() { do_tts_poll(); });
+    post_avail_msg();
   } else {
     reconn_speech(msg);
   }
+}
+
+void SpeechService::post_avail_msg() {
+  auto msg = Caps::new_instance();
+  msg->write(1);
+  flora_agent.post("yodaos.voice-interface.availability", msg);
 }
 
 static bool caps_read_number(shared_ptr<Caps> &caps, void *res) {
@@ -167,6 +182,7 @@ bool SpeechService::init_speech(shared_ptr<Caps> &data) {
 #ifdef ASR2NLP_WORKAROUND
   speecht->prepare(popts);
 #endif
+  tts->prepare(popts);
   return true;
 }
 
@@ -378,6 +394,68 @@ msg_invalid:
   reply->end(SPEECH_SERVICE_RPC_ERROR_INVALID_PARAM);
 }
 
+void SpeechService::handle_speak(shared_ptr<Caps> &msg,
+                                   shared_ptr<Reply> &reply) {
+  string channel;
+  string text;
+  if (msg->read(channel) != CAPS_SUCCESS || msg->read(text) != CAPS_SUCCESS
+      || text.empty()) {
+    KLOGW(TAG, "tts request msg format invalid");
+    reply->end(1);
+    return;
+  }
+  KLOGD(TAG, "tts request: channel %s, text %s", channel.c_str(), text.c_str());
+  if (text.empty()) {
+    KLOGW(TAG, "tts request text is empty");
+    reply->end(1);
+    return;
+  }
+  tts_mutex.lock();
+  if (tts_requests.size() >= MAX_PENDING_TTS_REQUEST) {
+    reply->end(2);
+  } else {
+    reply->end(0);
+    tts_requests.emplace(tts_requests.end(), text, channel);
+    if ((tts_status & VBS_PROC_STATUS_TTS_REQUESTING) == 0) {
+      tts_status |= VBS_PROC_STATUS_TTS_REQUESTING;
+      thrpool.push([this]() {
+        do_tts_requests();
+      });
+    }
+  }
+  tts_mutex.unlock();
+}
+
+void SpeechService::do_tts_requests() {
+  unique_lock<mutex> locker(tts_mutex);
+  TtsRequestList::iterator it;
+  while (true) {
+    ASSERT(tts_status & VBS_PROC_STATUS_TTS_REQUESTING);
+    if (tts_requests.empty()) {
+      tts_status &= (~VBS_PROC_STATUS_TTS_REQUESTING);
+      break;
+    }
+
+    it = tts_requests.begin();
+    auto id = tts->speak(it->text.c_str());
+    if (id < 0) {
+      it->status = -2;
+    } else {
+      // TODO: wait_for timeout
+      tts_req_finish.wait(locker);
+    }
+
+    post_tts_finish(it->channel, it->status);
+    tts_requests.erase(it);
+  }
+}
+
+void SpeechService::post_tts_finish(const string& channel, int32_t code) {
+  auto msg = Caps::new_instance();
+  msg->write(code);
+  flora_agent.post(channel.c_str(), msg);
+}
+
 void SpeechService::do_speech_poll() {
   SpeechResult result;
   int32_t turen_id;
@@ -464,10 +542,56 @@ void SpeechService::do_speecht_poll() {
     case SPEECH_RES_ERROR:
       end_pending_texts(result.id, result.err);
       break;
+    default:
+      break;
     }
   }
 }
 #endif
+
+void SpeechService::do_tts_poll() {
+  TtsResult result;
+
+  while (true) {
+    tts->poll(result);
+    switch (result.type) {
+    case TTS_RES_START:
+      KLOGD(TAG, "tts stream %d start", result.id);
+      break;
+    case TTS_RES_END:
+      KLOGD(TAG, "tts stream %d end", result.id);
+      tts_mutex.lock();
+      ASSERT(!tts_request.empty());
+      tts_requests.front().status = 0;
+      tts_req_finish.notify_one();
+      tts_mutex.unlock();
+      break;
+    case TTS_RES_VOICE:
+      ASSERT(!tts_requests.empty());
+      ASSERT(result.voice != nullptr);
+      write_tts_stream_to_channel(tts_requests.front().channel, *result.voice);
+      break;
+    case TTS_RES_ERROR:
+      KLOGD(TAG, "tts stream %d error: %d", result.id, result.err);
+      tts_mutex.lock();
+      ASSERT(!tts_request.empty());
+      tts_requests.front().status = -result.err;
+      tts_req_finish.notify_one();
+      tts_mutex.unlock();
+      break;
+    default:
+      break;
+    }
+  }
+}
+
+void SpeechService::write_tts_stream_to_channel(const string& channel,
+    const string& voice) {
+  auto msg = Caps::new_instance();
+  msg->write(0);
+  msg->write(voice.data(), voice.length());
+  flora_agent.post(channel.c_str(), msg);
+}
 
 void SpeechService::post_nlp(const string &nlp, const string &action,
                              int32_t id) {

@@ -48,7 +48,7 @@ static bool parse_cmdline(shared_ptr<CLArgs> &h, CmdlineArgs &res) {
         goto invalid_option;
       res.flora_uri = pair.value;
       res.flora_uri.append("#");
-      res.flora_uri.append(TAG);
+      res.flora_uri.append(FLORA_ID);
     } else if (pair.match("flora-reconn-interval")) {
       if (!pair.to_integer(iv))
         goto invalid_option;

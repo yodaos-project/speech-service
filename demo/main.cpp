@@ -3,7 +3,7 @@
 #include "rlog.h"
 
 #define TAG "speech-service.demo"
-#define FLORA_URI "tcp://localhost:2517/#speech-service.demo"
+#define FLORA_URI "tcp://localhost:37800/#speech-service.demo"
 
 using namespace std;
 
@@ -16,13 +16,13 @@ int main(int argc, char** argv) {
 		return 1;
 	}
 
-	cli->subscribe("rokid.speech.final_asr", FLORA_MSGTYPE_INSTANT);
-	cli->subscribe("rokid.speech.nlp", FLORA_MSGTYPE_INSTANT);
-	cli->subscribe("rokid.speech.error", FLORA_MSGTYPE_INSTANT);
+	cli->subscribe("rokid.speech.final_asr");
+	cli->subscribe("rokid.speech.nlp");
+	cli->subscribe("rokid.speech.error");
 
 	shared_ptr<Caps> msg = Caps::new_instance();
 	// speech server uri
-	msg->write("wss://apigwws.open.rokid.com:443/api");
+	msg->write("wss://cloudapigw.open.rokid.com:443/api");
 	// key
 	msg->write("6DDECE40ED024837AC9BDC4039DC3245");
 	// device type id
@@ -32,11 +32,13 @@ int main(int argc, char** argv) {
 	// device id
 	msg->write("speech-service.demo");
 	// reconn interval
-	msg->write((int32_t)10000);
+	msg->write(10000);
 	// ping interval
-	msg->write((int32_t)10000);
+	msg->write(10000);
 	// no resp timeout
-	msg->write((int32_t)20000);
+	msg->write(20000);
+  // conn duration
+  msg->write(900);
 	cli->post("rokid.speech.prepare_options", msg, FLORA_MSGTYPE_PERSIST);
 
 	msg = Caps::new_instance();
@@ -47,14 +49,16 @@ int main(int argc, char** argv) {
 	// VadMode CLOUD
 	msg->write((int32_t)1);
 	// vad timeout
-	msg->write((int32_t)500);
+	msg->write((int32_t)700);
 	// no nlp: default
 	msg->write((int32_t)-1);
 	// no intermediate asr
-	msg->write((int32_t)1);
+	msg->write((int32_t)0);
 	// vad begin
 	msg->write((int32_t)0);
-	cli->post("rokid.speech.speech_options", msg, FLORA_MSGTYPE_PERSIST);
+  // voice fragment
+  msg->write(0x10000000);
+	cli->post("rokid.speech.options", msg, FLORA_MSGTYPE_PERSIST);
 
 	iv.run(cli);
 	return 0;

@@ -1,10 +1,12 @@
 #pragma once
 
+#include <list>
 #include "caps.h"
 #include "defs.h"
 #include "flora-agent.h"
 #include "speech.h"
-#include <list>
+#include "tts.h"
+#include "thr-pool.h"
 
 typedef struct {
   int32_t speechid;
@@ -28,6 +30,8 @@ private:
   void handle_turen_sleep(std::shared_ptr<Caps> &msg);
   void handle_asr2nlp(std::shared_ptr<Caps> &msg,
                       std::shared_ptr<flora::Reply> &reply);
+  void handle_speak(std::shared_ptr<Caps> &msg,
+                      std::shared_ptr<flora::Reply> &reply);
 
 private:
   bool init_speech(std::shared_ptr<Caps> &data);
@@ -41,6 +45,8 @@ private:
 #ifdef ASR2NLP_WORKAROUND
   void do_speecht_poll();
 #endif
+
+  void do_tts_poll();
 
   void post_nlp(const std::string &nlp, const std::string &action, int32_t id);
 
@@ -69,11 +75,40 @@ private:
 
   void get_skilloptions(std::string &res);
 
+  void post_avail_msg();
+
+  void do_tts_requests();
+
+  void post_tts_finish(const std::string& channel, int32_t code);
+
+  void write_tts_stream_to_channel(const std::string& channel,
+      const std::string& voice);
+
 private:
+  class TtsRequest {
+  public:
+    TtsRequest(const std::string& t, const std::string& c)
+      : text{t}, channel{c} {}
+
+    std::string text;
+    std::string channel;
+    // 1: requesting
+    // 0: success finish
+    // <0: error code
+    int32_t status{1};
+  };
+  typedef std::list<TtsRequest> TtsRequestList;
+
   CmdlineArgs *cmdline_args = nullptr;
   std::shared_ptr<rokid::speech::Speech> speech;
 #ifdef ASR2NLP_WORKAROUND
   std::shared_ptr<rokid::speech::Speech> speecht;
+#endif
+  std::shared_ptr<rokid::speech::Tts> tts;
+#ifdef ASR2NLP_WORKAROUND
+  ThreadPool thrpool{4};
+#else
+  ThreadPool thrpool{3};
 #endif
   std::string stack;
   flora::Agent flora_agent;
@@ -86,6 +121,10 @@ private:
   // mutex for speech put_text and poll
   std::mutex text_mutex;
   std::list<TextReqInfo> pending_texts;
+  TtsRequestList tts_requests;
+  std::mutex tts_mutex;
+  std::condition_variable tts_req_finish;
+  uint32_t tts_status{0};
   std::mutex completed_mutex;
   int32_t lastest_completed_id = 0;
   std::string lastest_speech_file;

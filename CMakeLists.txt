@@ -13,7 +13,7 @@ else()
 endif()
 
 if (BUILD_DEBUG)
-	set (common_cxxflags "-g -O0")
+  set (common_cxxflags "-g -O0 -DSPEECH_DEBUG")
 else()
 	set (common_cxxflags -O3)
 	set (common_ldflags -s)
